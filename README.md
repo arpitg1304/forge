@@ -11,6 +11,7 @@
 <i>Convert, inspect, visualize, score, and discover robotics datasets across every major format.</i>
 <br><br>
 <a href="https://pypi.org/project/forge-robotics/"><img alt="PyPI" src="https://img.shields.io/pypi/v/forge-robotics?style=flat-square&color=6c9fff"></a>
+<a href="https://colab.research.google.com/github/arpitg1304/forge/blob/main/notebooks/forge_quickstart.ipynb"><img alt="Open in Colab" src="https://img.shields.io/badge/Colab-try%20it-F9AB00?style=flat-square&logo=googlecolab&logoColor=white"></a>
 <a href="https://arpitg1304.github.io/forge/"><img alt="Website" src="https://img.shields.io/badge/website-live-6c9fff?style=flat-square"></a>
 <a href="https://github.com/arpitg1304/forge"><img alt="Python 3.10+" src="https://img.shields.io/badge/python-3.10%2B-blue?style=flat-square"></a>
 <a href="https://github.com/arpitg1304/forge/blob/main/LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-green?style=flat-square"></a>
@@ -48,6 +49,10 @@ Any Reader → Episode/Frame → Any Writer
 ```
 
 Add a reader, get all writers for free. Add a writer, get all readers for free. No N×M conversion logic. See [docs/architecture.md](docs/architecture.md) for details.
+
+## Try it in 60 seconds (no install)
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/arpitg1304/forge/blob/main/notebooks/forge_quickstart.ipynb) &nbsp; **→** Pick a public LeRobot dataset, score every episode on 8 quality metrics, drill into the worst demos. No GPU. No auth. ~60 seconds wall-clock.
 
 ## Quick Start
 
