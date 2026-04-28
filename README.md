@@ -17,8 +17,9 @@
 <a href="https://github.com/arpitg1304/forge/blob/main/LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-green?style=flat-square"></a>
 <br><br>
 <code>RLDS ═══╗         ╔═══► LeRobot</code><br>
+<code>HDF5 ═══╣         ╠═══► MCAP</code><br>
 <code>Zarr ═══╬════⚙════╬═══► RoboDM</code><br>
-<code>HDF5 ═══╝         ╚═══► RLDS</code>
+<code>MCAP ═══╝         ╚═══► RLDS</code>
 </p>
 
 Convert between robotics dataset formats with one command. Score demonstration quality with research-backed metrics. Segment episodes into sub-skills with changepoint detection.
@@ -40,7 +41,7 @@ See [docs/model_formats.md](docs/model_formats.md) for which models (Octo, OpenV
 
 ## Why Forge?
 
-Every robotics lab has their own data format: Open-X uses RLDS, HuggingFace uses LeRobot, Diffusion Policy uses Zarr, robomimic uses HDF5. Want to train Octo on your ALOHA data? Write a converter. Want to use LeRobot on Open-X datasets? Write another.
+Every robotics lab has their own data format: Open-X uses RLDS, HuggingFace uses LeRobot, Diffusion Policy uses Zarr, robomimic uses HDF5, real-world ROS2 / teleop pipelines use MCAP. Want to train Octo on your ALOHA data? Write a converter. Want to use LeRobot on Open-X datasets? Write another.
 
 Forge uses a hub-and-spoke architecture — one intermediate representation, O(n) format support:
 
@@ -105,6 +106,17 @@ Works with HuggingFace Hub too:
 forge inspect hf://lerobot/pusht
 forge convert hf://lerobot/pusht ./output --format lerobot-v3
 ```
+
+## Common conversions
+
+| You have | You want | One command |
+|---|---|---|
+| MCAP recording from ROS2 / teleop | LeRobot v3 for HuggingFace | `forge convert teleop.mcap ./out --format lerobot-v3` |
+| RLDS from Open-X Embodiment | LeRobot for finetuning | `forge convert hf://openvla/modified_libero_rlds ./out --format lerobot-v3` |
+| HDF5 from ALOHA / robomimic | MCAP for Foxglove playback | `forge convert aloha.hdf5 ./out --format mcap` |
+| Zarr from Diffusion Policy | LeRobot v3 | `forge convert pusht.zarr ./out --format lerobot-v3` |
+| Any supported format | Quality scores per episode | `forge quality ./dataset` |
+| Any supported format | Filter out bad demos | `forge filter ./dataset ./clean --min-quality 6.0` |
 
 ## Python API
 
@@ -275,6 +287,7 @@ Planned features (contributions welcome!):
 - [ ] **Dataset merging** - Combine multiple datasets into one (`forge merge ds1/ ds2/ --output combined/`)
 - [ ] **Train/val/test splitting** - Split datasets with stratification (`--split 80/10/10`)
 - [x] **Dataset registry** - Curated catalog of 23+ robotics datasets with CLI browser and HTML viewer
+- [x] **MCAP first-class support** - Read + write, ROS2 CDR + Foxglove Protobuf, no ROS install required
 - [ ] **Streaming reads** - Process HuggingFace datasets without full download
 - [x] **Episode filtering** - Filter by quality score, flags, or episode IDs (`forge filter --min-quality 6.0`)
 - [ ] **Depth/point cloud support** - Preserve depth streams from RLDS/Open-X
