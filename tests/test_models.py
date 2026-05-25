@@ -72,6 +72,18 @@ class TestCameraInfo:
         cam = CameraInfo(name="depth", height=480, width=640, channels=1)
         assert cam.channels == 1
 
+    def test_storage_defaults_to_unknown(self):
+        cam = CameraInfo(name="cam", height=64, width=64)
+        assert cam.storage == "unknown"
+
+    def test_storage_inline_image(self):
+        cam = CameraInfo(name="cam", height=64, width=64, storage="image")
+        assert cam.storage == "image"
+
+    def test_storage_mp4(self):
+        cam = CameraInfo(name="cam", height=64, width=64, storage="mp4")
+        assert cam.storage == "mp4"
+
 
 class TestLazyImage:
     """Tests for LazyImage class."""

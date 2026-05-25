@@ -65,6 +65,9 @@ class CameraInfo:
         width: Image width in pixels.
         channels: Number of color channels (default 3 for RGB).
         encoding: Color encoding format ("rgb", "bgr", "depth", etc.).
+        storage: How frames are physically stored — "mp4" (external video
+            file), "image" (inline image bytes in the row, e.g. parquet
+            with dtype=image), or "unknown" if the reader can't tell.
     """
 
     name: str
@@ -72,6 +75,7 @@ class CameraInfo:
     width: int
     channels: int = 3
     encoding: str = "rgb"
+    storage: str = "unknown"
 
     def __post_init__(self) -> None:
         if self.height <= 0 or self.width <= 0:

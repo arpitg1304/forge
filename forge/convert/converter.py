@@ -121,6 +121,7 @@ def _process_episode_worker(
                 width=cam_data["width"],
                 channels=cam_data.get("channels", 3),
                 encoding=cam_data.get("encoding", "rgb"),
+                storage=cam_data.get("storage", "unknown"),
             )
 
         # Apply config overrides
@@ -442,6 +443,7 @@ class Converter:
                     "width": cam.width,
                     "channels": cam.channels,
                     "encoding": cam.encoding,
+                    "storage": cam.storage,
                 }
                 for name, cam in dataset_info.cameras.items()
             },
