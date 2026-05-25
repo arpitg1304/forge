@@ -156,6 +156,15 @@ def _quick_inspect_hub(path: str, output: str = "text") -> None:
     tfrecord_files = [f for f in files if f.endswith(".tfrecord")]
     video_files = [f for f in files if f.endswith((".mp4", ".webm", ".avi"))]
 
+    # Infer how camera frames are physically stored.
+    # For lerobot-v3, the absence of any .mp4 alongside data parquet shards
+    # means frames are inline image bytes in the parquet rows (dtype=image).
+    camera_storage: str | None = None
+    if format_detected == "lerobot-v3" and parquet_files:
+        camera_storage = "mp4" if video_files else "inline images in parquet"
+    elif format_detected == "lerobot-v2" and parquet_files:
+        camera_storage = "mp4" if video_files else "inline images in parquet"
+
     # Calculate total size
     total_size = 0
     if info.siblings:
@@ -174,6 +183,7 @@ def _quick_inspect_hub(path: str, output: str = "text") -> None:
             "hdf5_files": len(hdf5_files),
             "tfrecord_files": len(tfrecord_files),
             "video_files": len(video_files),
+            "camera_storage": camera_storage,
             "downloads": info.downloads,
             "likes": info.likes,
             "tags": info.tags,
@@ -215,6 +225,9 @@ def _quick_inspect_hub(path: str, output: str = "text") -> None:
         console.print(f"[bold]TFRecord files:[/bold] {len(tfrecord_files)}")
     if video_files:
         console.print(f"[bold]Video files:[/bold] {len(video_files)}")
+
+    if camera_storage:
+        console.print(f"[bold]Camera storage:[/bold] {camera_storage}")
 
     # Hub stats
     console.print()
@@ -330,6 +343,7 @@ def inspect_cmd(
                     "width": cam.width,
                     "channels": cam.channels,
                     "encoding": cam.encoding,
+                    "storage": cam.storage,
                 }
                 for name, cam in info.cameras.items()
             },
@@ -397,8 +411,13 @@ def inspect_cmd(
     if info.cameras:
         console.print()
         console.print("[bold]Cameras:[/bold]")
+        storage_label = {"mp4": "mp4 video", "image": "inline image in parquet"}
         for name, cam in info.cameras.items():
-            console.print(f"  {name}: {cam.width}x{cam.height} ({cam.encoding})")
+            label = storage_label.get(cam.storage)
+            suffix = f", {label}" if label else ""
+            console.print(
+                f"  {name}: {cam.width}x{cam.height} ({cam.encoding}{suffix})"
+            )
 
     # Inferred properties
     console.print()

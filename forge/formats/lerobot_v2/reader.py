@@ -179,11 +179,18 @@ class LeRobotV2Reader:
                         # Extract camera name from key like "observation.images.top"
                         parts = key.split(".")
                         cam_name = parts[-1] if len(parts) > 1 else key
+                        dtype_str = spec.get("dtype", "")
+                        storage = (
+                            "mp4" if dtype_str == "video"
+                            else "image" if dtype_str == "image"
+                            else "unknown"
+                        )
                         info.cameras[cam_name] = CameraInfo(
                             name=cam_name,
                             height=shape[0] if len(shape) > 0 else 480,
                             width=shape[1] if len(shape) > 1 else 640,
                             channels=shape[2] if len(shape) > 2 else 3,
+                            storage=storage,
                         )
                     elif "state" in key.lower() or "action" in key.lower():
                         shape = tuple(spec.get("shape", []))
@@ -321,6 +328,7 @@ class LeRobotV2Reader:
                             height=dims[0],
                             width=dims[1],
                             channels=3,
+                            storage="mp4",
                         )
 
     def _get_video_dimensions(self, video_path: Path) -> tuple[int, int]:

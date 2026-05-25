@@ -325,18 +325,23 @@ class LeRobotV3Reader:
                             info.has_timestamps = True
                         continue
 
-                    # Detect cameras (dtype == "video" is the v3 convention)
-                    if dtype_str == "video" or ("image" in key.lower() and len(shape) == 3):
+                    # Detect cameras (dtype == "video" is the v3 convention;
+                    # dtype == "image" means inline image bytes in parquet)
+                    is_video = dtype_str == "video"
+                    is_inline_image = dtype_str == "image"
+                    if is_video or is_inline_image or ("image" in key.lower() and len(shape) == 3):
                         cam_name = key.split(".")[-1]
                         # Shape is [height, width, channels] in v3
                         if len(shape) >= 2:
                             h, w = shape[0], shape[1]
                             c = shape[2] if len(shape) > 2 else 3
+                            storage = "mp4" if is_video else ("image" if is_inline_image else "unknown")
                             info.cameras[cam_name] = CameraInfo(
                                 name=cam_name,
                                 height=h,
                                 width=w,
                                 channels=c,
+                                storage=storage,
                             )
                     elif "action" in key.lower():
                         info.action_schema = FieldSchema(
@@ -624,6 +629,7 @@ class LeRobotV3Reader:
                 height=dims[0],
                 width=dims[1],
                 channels=3,
+                storage="mp4",
             )
 
     def _get_video_dimensions(self, video_path: Path) -> tuple[int, int]:
