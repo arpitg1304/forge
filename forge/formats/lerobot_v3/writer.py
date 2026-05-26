@@ -65,6 +65,9 @@ class LeRobotV3WriterConfig:
     video_crf: int = 23
     video_preset: str = "medium"
     chunks_size: int = 1000
+    # Upstream v3 target sizes for chunk-file packing (info.json requires both).
+    data_files_size_in_mb: int = 100
+    video_files_size_in_mb: int = 200
     repo_id: str | None = None
     camera_name_mapping: dict[str, str] = field(default_factory=dict)
 
@@ -103,6 +106,10 @@ class LeRobotV3Writer:
         self._task_metadata: list[dict[str, Any]] = []
         self._tasks_seen: dict[str, int] = {}  # task -> task_index
         self._cameras: dict[str, CameraInfo] = {}
+        # Mapped video keys (e.g. "observation.images.top") in insertion order.
+        # episodes.parquet needs per-video-key pointer columns; we collect the
+        # set during write_episode so finalize can emit them deterministically.
+        self._video_keys: list[str] = []
         self._total_frames: int = 0
         self._features: dict[str, dict[str, Any]] = {}
 
@@ -138,6 +145,86 @@ class LeRobotV3Writer:
             clean_name = clean_name[:-4]
 
         return f"observation.images.{clean_name}"
+
+    # Features included in stats columns. Image/video features are skipped
+    # for now — upstream loaders only require *some* feature to have stats,
+    # not all, and pixel-stat computation is expensive.
+    _STAT_FEATURES = ("observation.state", "action")
+
+    def _compute_episode_stats(self, table: Any | None) -> dict[str, dict[str, list]]:
+        """Compute min/max/mean/std/count per feature for one episode's data.
+
+        Returns ``{feature_name: {min, max, mean, std, count}}``. Each value
+        is a list (vector for state/action, ``[N]`` for count).
+        """
+        import numpy as np
+
+        out: dict[str, dict[str, list]] = {}
+        if table is None or table.num_rows == 0:
+            return out
+
+        for feat in self._STAT_FEATURES:
+            if feat not in table.column_names:
+                continue
+            arr = np.asarray(table[feat].to_pylist(), dtype=np.float64)
+            if arr.ndim == 1:
+                arr = arr.reshape(-1, 1)
+            out[feat] = {
+                "min": arr.min(axis=0).tolist(),
+                "max": arr.max(axis=0).tolist(),
+                "mean": arr.mean(axis=0).tolist(),
+                "std": arr.std(axis=0).tolist(),
+                "count": [int(arr.shape[0])],
+            }
+        return out
+
+    def _aggregate_episode_stats(
+        self, per_episode: list[dict[str, dict[str, list]]]
+    ) -> dict[str, dict[str, list]]:
+        """Pool per-episode stats into dataset-wide stats for meta/stats.json.
+
+        Uses the standard pooled-variance identity:
+            var_pool = (Σ n_i·(var_i + mean_i²)) / Σ n_i − mean_pool²
+        which is exact when episode samples are disjoint (they are here).
+        """
+        import numpy as np
+
+        agg: dict[str, dict[str, list]] = {}
+        feature_names = {feat for ep in per_episode for feat in ep}
+        for feat in feature_names:
+            mins, maxs, means, stds, counts = [], [], [], [], []
+            for ep in per_episode:
+                if feat not in ep:
+                    continue
+                s = ep[feat]
+                mins.append(s["min"])
+                maxs.append(s["max"])
+                means.append(s["mean"])
+                stds.append(s["std"])
+                counts.append(s["count"][0])
+            if not counts:
+                continue
+            mins_arr = np.asarray(mins, dtype=np.float64)
+            maxs_arr = np.asarray(maxs, dtype=np.float64)
+            means_arr = np.asarray(means, dtype=np.float64)
+            stds_arr = np.asarray(stds, dtype=np.float64)
+            counts_arr = np.asarray(counts, dtype=np.float64).reshape(-1, 1)
+
+            total = counts_arr.sum()
+            pooled_mean = (counts_arr * means_arr).sum(axis=0) / total
+            pooled_var = (
+                (counts_arr * (stds_arr ** 2 + means_arr ** 2)).sum(axis=0) / total
+                - pooled_mean ** 2
+            )
+            pooled_var = np.clip(pooled_var, 0.0, None)  # numerical safety
+            agg[feat] = {
+                "min": mins_arr.min(axis=0).tolist(),
+                "max": maxs_arr.max(axis=0).tolist(),
+                "mean": pooled_mean.tolist(),
+                "std": np.sqrt(pooled_var).tolist(),
+                "count": [int(total)],
+            }
+        return agg
 
     def _get_chunk_file_indices(self, episode_index: int) -> tuple[int, int]:
         """Get chunk and file indices for an episode.
@@ -279,6 +366,7 @@ class LeRobotV3Writer:
                         "dtype": "float32",
                         "shape": list(frame.state.shape),
                         "names": None,
+                        "fps": float(fps),
                     }
 
             # Add action
@@ -289,6 +377,7 @@ class LeRobotV3Writer:
                         "dtype": "float32",
                         "shape": list(frame.action.shape),
                         "names": None,
+                        "fps": float(fps),
                     }
 
             # Collect camera frames for video encoding
@@ -300,6 +389,8 @@ class LeRobotV3Writer:
                 if mapped_name not in self._current_chunk_videos:
                     self._current_chunk_videos[mapped_name] = []
                 self._current_chunk_videos[mapped_name].append(lazy_img)
+                if mapped_name not in self._video_keys:
+                    self._video_keys.append(mapped_name)
 
                 # Track camera info
                 if cam_name not in self._cameras:
@@ -365,6 +456,7 @@ class LeRobotV3Writer:
         self._task_metadata = []
         self._tasks_seen = {}
         self._cameras = {}
+        self._video_keys = []
         self._total_frames = 0
         self._features = {}
         self._current_chunk_frames = []
@@ -430,31 +522,36 @@ class LeRobotV3Writer:
         total_episodes = len(self._episode_metadata) if self._episode_metadata else dataset_info.num_episodes
         total_frames = self._total_frames if self._total_frames > 0 else dataset_info.total_frames
 
-        # Add standard features
+        # Add standard features (fps required on every non-video feature in v3)
         self._features["episode_index"] = {
             "dtype": "int64",
             "shape": [1],
             "names": None,
+            "fps": float(fps),
         }
         self._features["frame_index"] = {
             "dtype": "int64",
             "shape": [1],
             "names": None,
+            "fps": float(fps),
         }
         self._features["timestamp"] = {
             "dtype": "float32",
             "shape": [1],
             "names": None,
+            "fps": float(fps),
         }
         self._features["index"] = {
             "dtype": "int64",
             "shape": [1],
             "names": None,
+            "fps": float(fps),
         }
         self._features["task_index"] = {
             "dtype": "int64",
             "shape": [1],
             "names": None,
+            "fps": float(fps),
         }
 
         # Calculate number of chunks (each episode is its own chunk)
@@ -483,6 +580,7 @@ class LeRobotV3Writer:
                             "dtype": dtype,
                             "shape": shape,
                             "names": None,
+                            "fps": float(fps),
                         }
 
             # Check for video features
@@ -534,6 +632,8 @@ class LeRobotV3Writer:
             },
             "data_path": "data/chunk-{chunk_index:03d}/file-{file_index:03d}.parquet",
             "video_path": "videos/{video_key}/chunk-{chunk_index:03d}/file-{file_index:03d}.mp4",
+            "data_files_size_in_mb": int(self.config.data_files_size_in_mb),
+            "video_files_size_in_mb": int(self.config.video_files_size_in_mb),
             "features": self._features,
         }
 
@@ -543,52 +643,89 @@ class LeRobotV3Writer:
         with open(meta_dir / "info.json", "w") as f:
             json.dump(info, f, indent=2)
 
-        # Write episodes metadata in chunked parquet format (one episode per chunk)
-        if self._episode_metadata:
-            # Sequential mode: write one episode metadata file per chunk
-            for chunk_idx, ep_meta in enumerate(self._episode_metadata):
-                episodes_dir = meta_dir / "episodes" / f"chunk-{chunk_idx:03d}"
-                episodes_dir.mkdir(parents=True, exist_ok=True)
+        # Write episodes metadata in full v3 schema (one episode per chunk file).
+        #
+        # Each row now carries everything the upstream LeRobotDataset loader
+        # needs to find frames and resolve language:
+        #   - episode_index, length, tasks (list[str])
+        #   - data/{chunk_index,file_index}, dataset_from_index, dataset_to_index
+        #   - meta/episodes/{chunk_index,file_index}
+        #   - videos/{key}/{chunk_index,file_index,from_timestamp,to_timestamp}
+        #   - stats/{feature}/{min,max,mean,std,count}
+        per_episode_stats: list[dict[str, Any]] = []
+        per_episode_tasks: list[str] = []
+        index_to_task: dict[int, str] = {
+            t["task_index"]: t["task"] for t in (self._task_metadata or [])
+        }
+        if not index_to_task:
+            index_to_task = {0: "default"}
 
-                table = pa.Table.from_pylist([ep_meta])
-                pq.write_table(table, episodes_dir / "file-000.parquet")
-        else:
-            # Parallel mode: generate episode metadata
-            # Use pre-computed frame counts from dataset_info if available (much faster)
-            parallel_frame_counts = dataset_info.metadata.get("_parallel_episode_frame_counts", {})
+        global_offset = 0
+        for episode_idx in range(total_episodes):
+            chunk_idx = episode_idx  # per-episode chunking (current layout)
+            file_idx = 0
 
-            for episode_idx in range(total_episodes):
-                chunk_idx = episode_idx  # In parallel mode, each episode is its own chunk
+            data_file = (
+                output_path / "data" / f"chunk-{chunk_idx:03d}" / f"file-{file_idx:03d}.parquet"
+            )
+            data_table = pq.read_table(data_file) if data_file.exists() else None
+            length = data_table.num_rows if data_table is not None else 0
 
-                # Use cached frame count if available, otherwise fall back to reading file
-                if episode_idx in parallel_frame_counts:
-                    length = parallel_frame_counts[episode_idx]
-                else:
-                    data_file = output_path / "data" / f"chunk-{chunk_idx:03d}" / "file-000.parquet"
-                    if data_file.exists():
-                        ep_table = pq.read_table(data_file)
-                        length = ep_table.num_rows
-                    else:
-                        length = 0
+            # Resolve task for this episode.
+            if episode_idx < len(self._episode_metadata):
+                task_index = int(self._episode_metadata[episode_idx].get("task_index", 0))
+            elif data_table is not None and "task_index" in data_table.column_names:
+                task_index = int(data_table["task_index"][0].as_py())
+            else:
+                task_index = 0
+            task_str = index_to_task.get(task_index, "default")
+            per_episode_tasks.append(task_str)
 
-                episode_meta = {
-                    "episode_index": episode_idx,
-                    "length": length,
-                    "task_index": 0,
-                }
+            # Per-episode stats over numeric features (state + action).
+            ep_stats = self._compute_episode_stats(data_table)
+            per_episode_stats.append(ep_stats)
 
-                episodes_dir = meta_dir / "episodes" / f"chunk-{chunk_idx:03d}"
-                episodes_dir.mkdir(parents=True, exist_ok=True)
+            row: dict[str, Any] = {
+                "episode_index": episode_idx,
+                "length": length,
+                "tasks": [task_str],
+                "data/chunk_index": chunk_idx,
+                "data/file_index": file_idx,
+                "dataset_from_index": global_offset,
+                "dataset_to_index": global_offset + length,
+                "meta/episodes/chunk_index": chunk_idx,
+                "meta/episodes/file_index": file_idx,
+            }
+            for vid_key in self._video_keys:
+                # With per-episode chunking each video file holds exactly one
+                # episode, so it spans the full [0, length/fps) range.
+                row[f"videos/{vid_key}/chunk_index"] = chunk_idx
+                row[f"videos/{vid_key}/file_index"] = file_idx
+                row[f"videos/{vid_key}/from_timestamp"] = 0.0
+                row[f"videos/{vid_key}/to_timestamp"] = float(length) / float(fps)
+            for feat_name, stats in ep_stats.items():
+                for stat_name, value in stats.items():
+                    row[f"stats/{feat_name}/{stat_name}"] = value
 
-                ep_meta_table = pa.Table.from_pylist([episode_meta])
-                pq.write_table(ep_meta_table, episodes_dir / "file-000.parquet")
+            episodes_dir = meta_dir / "episodes" / f"chunk-{chunk_idx:03d}"
+            episodes_dir.mkdir(parents=True, exist_ok=True)
+            pq.write_table(
+                pa.Table.from_pylist([row]),
+                episodes_dir / f"file-{file_idx:03d}.parquet",
+            )
+            global_offset += length
 
-        # Write tasks.parquet
-        if self._task_metadata:
-            tasks_table = pa.Table.from_pylist(self._task_metadata)
-            pq.write_table(tasks_table, meta_dir / "tasks.parquet")
-        else:
-            # Parallel mode: write default task
-            default_task = [{"task_index": 0, "task": "default"}]
-            tasks_table = pa.Table.from_pylist(default_task)
-            pq.write_table(tasks_table, meta_dir / "tasks.parquet")
+        # Aggregate stats across all episodes → meta/stats.json
+        aggregate = self._aggregate_episode_stats(per_episode_stats)
+        with open(meta_dir / "stats.json", "w") as f:
+            json.dump(aggregate, f, indent=2)
+
+        # Write tasks.parquet — upstream io_utils.write_tasks does
+        # `tasks.index.name = "task"; tasks.to_parquet(...)`. Pandas preserves
+        # the index in parquet metadata and the upstream loader reads
+        # `tasks.index` (not a column) to map task strings to task_index.
+        import pandas as pd
+
+        task_rows = self._task_metadata or [{"task_index": 0, "task": "default"}]
+        tasks_df = pd.DataFrame(task_rows).set_index("task")
+        tasks_df.to_parquet(meta_dir / "tasks.parquet")
