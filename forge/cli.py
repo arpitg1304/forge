@@ -25,14 +25,70 @@ app.add_typer(registry_app, name="registry")
 console = Console()
 
 
+def _looks_like_hf_repo_id(path_str: str) -> bool:
+    """Return True if `path_str` looks like a bare HF repo_id (`org/repo`).
+
+    Used to give `forge inspect lerobot/aloha_static_coffee` the same
+    treatment as `hf://lerobot/aloha_static_coffee` when there's no local
+    directory with that name.
+    """
+    if "/" not in path_str or path_str.startswith((".", "/")):
+        return False
+    parts = path_str.split("/")
+    if len(parts) != 2:
+        return False
+    org, repo = parts
+    if not org or not repo:
+        return False
+    # Excludes obvious file-like names (e.g. "foo/data.parquet").
+    if "." in repo and repo.rsplit(".", 1)[-1].isalpha():
+        return False
+    return True
+
+
+def _resolve_via_hub(repo_id_or_url: str) -> Path:
+    """Resolve a HuggingFace dataset reference to a local path.
+
+    Prefers a populated snapshot in the local HF cache; falls back to
+    downloading via `huggingface_hub.snapshot_download`.
+    """
+    from forge.hub import (
+        download_dataset,
+        find_in_hf_cache,
+        is_hf_url,
+        parse_hf_url,
+    )
+    from forge.hub.url import HFDatasetRef
+
+    if is_hf_url(repo_id_or_url):
+        ref = parse_hf_url(repo_id_or_url)
+    else:
+        ref = HFDatasetRef(repo_id=repo_id_or_url)
+
+    cached = find_in_hf_cache(ref.repo_id, revision=ref.revision)
+    if cached is not None:
+        console.print(
+            f"[cyan]Using cached HuggingFace dataset:[/cyan] {ref.repo_id}"
+        )
+        console.print(f"[dim]{cached}[/dim]")
+        return cached
+
+    console.print(f"[cyan]Downloading from HuggingFace Hub:[/cyan] {ref.repo_id}")
+    with console.status("[bold green]Downloading dataset..."):
+        local_path = download_dataset(ref)
+    console.print(f"[green]Downloaded to:[/green] {local_path}")
+    return local_path
+
+
 def _resolve_dataset_path(path_str: str, demo: bool = False) -> Path:
     """Resolve a dataset path, downloading from HuggingFace Hub if needed.
 
     Resolution order:
-    1. HuggingFace URL (hf://org/repo) — download via hub module
+    1. HuggingFace URL (hf://org/repo) — reuse local HF cache or download
     2. Existing filesystem path — return as-is
     3. Registry dataset ID — lookup and resolve source URI
-    4. Fall through as filesystem path (for error reporting by caller)
+    4. Bare HF repo_id (`org/repo`) — reuse local HF cache or download
+    5. Fall through as filesystem path (for error reporting by caller)
 
     Args:
         path_str: Local path, HuggingFace URL, or registry dataset ID.
@@ -44,16 +100,7 @@ def _resolve_dataset_path(path_str: str, demo: bool = False) -> Path:
     from forge.hub import is_hf_url
 
     if is_hf_url(path_str):
-        from forge.hub import download_dataset, parse_hf_url
-
-        ref = parse_hf_url(path_str)
-        console.print(f"[cyan]Downloading from HuggingFace Hub:[/cyan] {ref.repo_id}")
-
-        with console.status("[bold green]Downloading dataset..."):
-            local_path = download_dataset(path_str)
-
-        console.print(f"[green]Downloaded to:[/green] {local_path}")
-        return local_path
+        return _resolve_via_hub(path_str)
 
     # Check filesystem first
     path = Path(path_str)
@@ -96,6 +143,11 @@ def _resolve_dataset_path(path_str: str, demo: bool = False) -> Path:
             elif isinstance(e, (typer.Exit, SystemExit)):
                 raise
             # Other errors: fall through silently
+
+    # Bare `org/repo` that didn't match a local path or registry entry —
+    # try treating it as a HuggingFace repo_id.
+    if _looks_like_hf_repo_id(path_str):
+        return _resolve_via_hub(path_str)
 
     return path
 

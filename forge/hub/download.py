@@ -18,6 +18,25 @@ from forge.hub.url import HFDatasetRef, is_hf_url, parse_hf_url
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+# File extensions that indicate a snapshot has actual dataset content,
+# not just metadata stubs (info.json/README/.gitattributes).
+_DATASET_FILE_EXTENSIONS = {
+    ".parquet",
+    ".mp4",
+    ".webm",
+    ".avi",
+    ".h5",
+    ".hdf5",
+    ".tfrecord",
+    ".npy",
+    ".npz",
+    ".zarr",
+    ".arrow",
+    ".bag",
+    ".mcap",
+    ".db3",
+}
+
 
 def _check_huggingface_hub() -> None:
     """Check if huggingface_hub is available."""
@@ -31,20 +50,132 @@ def _check_huggingface_hub() -> None:
         )
 
 
-def get_cache_dir() -> Path:
-    """Get the cache directory for downloaded datasets.
+def get_cache_dir() -> Path | None:
+    """Get the cache directory to use for downloads.
 
-    Uses FORGE_CACHE_DIR environment variable if set,
-    otherwise falls back to ~/.cache/forge/datasets.
-
-    Returns:
-        Path to cache directory.
+    If FORGE_CACHE_DIR is set, returns that (with a /datasets subdir for
+    backwards compatibility with older forge cache layouts). Otherwise
+    returns None, signalling "use the standard HuggingFace Hub cache"
+    (`~/.cache/huggingface/hub/`) so downloads dedupe with other HF tools.
     """
     cache_dir = os.environ.get("FORGE_CACHE_DIR")
     if cache_dir:
         return Path(cache_dir) / "datasets"
+    return None
 
-    return Path.home() / ".cache" / "forge" / "datasets"
+
+def get_hf_cache_dir() -> Path:
+    """Get the path to the standard HuggingFace Hub cache directory.
+
+    Honours HF_HOME / HUGGINGFACE_HUB_CACHE / HF_HUB_CACHE if set, falling
+    back to ~/.cache/huggingface/hub.
+    """
+    hf_hub_cache = os.environ.get("HF_HUB_CACHE") or os.environ.get(
+        "HUGGINGFACE_HUB_CACHE"
+    )
+    if hf_hub_cache:
+        return Path(hf_hub_cache)
+
+    hf_home = os.environ.get("HF_HOME")
+    if hf_home:
+        return Path(hf_home) / "hub"
+
+    return Path.home() / ".cache" / "huggingface" / "hub"
+
+
+def _repo_folder_name(repo_id: str) -> str:
+    """Translate a repo_id into the HF cache's folder name.
+
+    HF Hub names dataset cache folders as `datasets--{org}--{repo}`, with
+    any `/` in the repo_id replaced by `--`.
+    """
+    return "datasets--" + repo_id.replace("/", "--")
+
+
+def _snapshot_is_populated(snapshot_dir: Path) -> bool:
+    """Return True if the snapshot contains real dataset files.
+
+    HF caches will sometimes contain only a `meta/info.json` (or just a
+    README) for repos the user browsed but never fully pulled. Those stubs
+    are useless to forge — we want a snapshot with at least one parquet,
+    mp4, hdf5, tfrecord, etc.
+    """
+    if not snapshot_dir.is_dir():
+        return False
+    for entry in snapshot_dir.rglob("*"):
+        if entry.is_file() and entry.suffix.lower() in _DATASET_FILE_EXTENSIONS:
+            return True
+    return False
+
+
+def find_in_hf_cache(
+    repo_id: str,
+    revision: str | None = None,
+    cache_dir: Path | str | None = None,
+) -> Path | None:
+    """Look up a dataset snapshot in the local HuggingFace Hub cache.
+
+    Returns the path to a populated snapshot if found, else None. A
+    "populated" snapshot is one that contains at least one real dataset
+    file (parquet/mp4/hdf5/tfrecord/etc.) — metadata-only stubs are
+    ignored because forge can't actually work with them.
+
+    Args:
+        repo_id: HF repo identifier, e.g. "lerobot/aloha_static_coffee".
+        revision: Optional branch name or commit sha. If None, tries
+            common default branches (main, master) before falling back to
+            the most recently populated snapshot.
+        cache_dir: Override the HF cache root (defaults to the standard
+            ~/.cache/huggingface/hub location).
+
+    Returns:
+        Path to the populated snapshot directory, or None.
+    """
+    root = Path(cache_dir) if cache_dir is not None else get_hf_cache_dir()
+    repo_dir = root / _repo_folder_name(repo_id)
+    snapshots_dir = repo_dir / "snapshots"
+    if not snapshots_dir.is_dir():
+        return None
+
+    candidates: list[Path] = []
+
+    if revision:
+        ref_file = repo_dir / "refs" / revision
+        if ref_file.is_file():
+            try:
+                sha = ref_file.read_text().strip()
+            except OSError:
+                sha = ""
+            if sha:
+                candidates.append(snapshots_dir / sha)
+        candidates.append(snapshots_dir / revision)
+    else:
+        for branch in ("main", "master"):
+            ref_file = repo_dir / "refs" / branch
+            if ref_file.is_file():
+                try:
+                    sha = ref_file.read_text().strip()
+                except OSError:
+                    continue
+                if sha:
+                    candidates.append(snapshots_dir / sha)
+
+    for candidate in candidates:
+        if _snapshot_is_populated(candidate):
+            return candidate
+
+    # Fall back: scan all snapshots, pick the most recently modified
+    # populated one. Useful when refs/ is missing or when the user pulled
+    # via a tool that didn't write refs.
+    fallback: tuple[float, Path] | None = None
+    for snap in snapshots_dir.iterdir():
+        if not snap.is_dir() or not _snapshot_is_populated(snap):
+            continue
+        mtime = snap.stat().st_mtime
+        if fallback is None or mtime > fallback[0]:
+            fallback = (mtime, snap)
+
+    return fallback[1] if fallback else None
 
 
 def download_dataset(
@@ -92,11 +223,24 @@ def download_dataset(
             subset=ref.subset,
         )
 
-    # Set up cache directory
+    # Resolve cache directory. None means "use the HF default cache",
+    # which gives us free dedup with anything pulled via huggingface-cli
+    # or the `datasets` library.
     if cache_dir is None:
         cache_dir = get_cache_dir()
-    cache_dir = Path(cache_dir)
-    cache_dir.mkdir(parents=True, exist_ok=True)
+    if cache_dir is not None:
+        cache_dir = Path(cache_dir)
+        cache_dir.mkdir(parents=True, exist_ok=True)
+
+    # Fast path: a populated snapshot already on disk → skip the download.
+    if not force_download:
+        cached = find_in_hf_cache(
+            ref.repo_id,
+            revision=ref.revision,
+            cache_dir=cache_dir,
+        )
+        if cached is not None:
+            return cached
 
     # Download the dataset
     try:
@@ -104,7 +248,7 @@ def download_dataset(
             repo_id=ref.repo_id,
             repo_type="dataset",
             revision=ref.revision,
-            cache_dir=str(cache_dir),
+            cache_dir=str(cache_dir) if cache_dir is not None else None,
             force_download=force_download,
             # Use symlinks to save disk space
             local_dir_use_symlinks=True,
