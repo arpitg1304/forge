@@ -1,5 +1,6 @@
 """Tests for the CLI."""
 
+import json
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -7,6 +8,22 @@ from typer.testing import CliRunner
 from forge.cli import app
 
 runner = CliRunner()
+
+
+def _make_hf_cache(root: Path, repo_id: str, sha: str, files: dict[str, str]) -> Path:
+    """Build a minimal HF Hub cache layout under `root` for one repo."""
+    repo_folder = "datasets--" + repo_id.replace("/", "--")
+    repo_dir = root / repo_folder
+    snapshot_dir = repo_dir / "snapshots" / sha
+    snapshot_dir.mkdir(parents=True)
+    refs_dir = repo_dir / "refs"
+    refs_dir.mkdir(parents=True)
+    (refs_dir / "main").write_text(sha)
+    for rel_path, content in files.items():
+        target = snapshot_dir / rel_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(content)
+    return snapshot_dir
 
 
 class TestCLI:
@@ -50,3 +67,107 @@ class TestCLI:
         assert "inspect" in result.stdout
         assert "formats" in result.stdout
         assert "version" in result.stdout
+
+
+class TestLocalCommand:
+    """Tests for `forge local`."""
+
+    def test_lists_populated_datasets_from_custom_path(self, tmp_path):
+        _make_hf_cache(
+            tmp_path, "lerobot/foo", "a" * 40,
+            {"data/file.parquet": "x", "videos/cam/v.mp4": "y"},
+        )
+        _make_hf_cache(
+            tmp_path, "lerobot/stub", "b" * 40, {"meta/info.json": "{}"},
+        )
+        result = runner.invoke(
+            app, ["local", "--path", str(tmp_path), "--no-detect"]
+        )
+        assert result.exit_code == 0, result.stdout
+        assert "lerobot/foo" in result.stdout
+        # Stubs hidden by default.
+        assert "lerobot/stub" not in result.stdout
+
+    def test_all_flag_includes_stubs(self, tmp_path):
+        _make_hf_cache(
+            tmp_path, "lerobot/foo", "a" * 40, {"data/file.parquet": "x"},
+        )
+        _make_hf_cache(
+            tmp_path, "lerobot/stub", "b" * 40, {"meta/info.json": "{}"},
+        )
+        result = runner.invoke(
+            app, ["local", "--path", str(tmp_path), "--all", "--no-detect"]
+        )
+        assert result.exit_code == 0, result.stdout
+        assert "lerobot/foo" in result.stdout
+        assert "lerobot/stub" in result.stdout
+
+    def test_json_output(self, tmp_path):
+        _make_hf_cache(
+            tmp_path, "lerobot/foo", "a" * 40, {"data/file.parquet": "x"},
+        )
+        result = runner.invoke(
+            app, ["local", "--path", str(tmp_path), "--no-detect", "-o", "json"]
+        )
+        assert result.exit_code == 0, result.stdout
+        data = json.loads(result.stdout)
+        assert data["count"] == 1
+        assert data["datasets"][0]["repo_id"] == "lerobot/foo"
+        assert data["datasets"][0]["is_stub"] is False
+        assert data["datasets"][0]["file_counts"] == {".parquet": 1}
+
+    def test_missing_path_prints_warning(self, tmp_path):
+        result = runner.invoke(
+            app, ["local", "--path", str(tmp_path / "nope")]
+        )
+        assert result.exit_code == 0
+        assert "does not exist" in result.stdout
+
+    def test_empty_cache_message(self, tmp_path):
+        result = runner.invoke(app, ["local", "--path", str(tmp_path)])
+        assert result.exit_code == 0
+        assert "No populated datasets" in result.stdout
+
+    def test_resolves_bare_repo_id_via_lerobot_cache(self, tmp_path, monkeypatch):
+        # Build a fake LeRobot cache with one dataset and point the env var
+        # at it. `forge inspect arpit/foo` should resolve via this cache
+        # instead of going to the network.
+        ds = tmp_path / "arpit" / "foo"
+        (ds / "meta").mkdir(parents=True)
+        (ds / "data" / "chunk-000").mkdir(parents=True)
+        (ds / "videos" / "chunk-000" / "cam").mkdir(parents=True)
+        (ds / "meta" / "info.json").write_text(
+            '{"codebase_version":"v2.1","total_episodes":1,"total_frames":1,'
+            '"fps":30,"robot_type":"so101","features":{},"chunks_size":1000,'
+            '"data_path":"data/chunk-{episode_chunk:03d}/episode_{episode_index:06d}.parquet",'
+            '"video_path":"videos/chunk-{episode_chunk:03d}/{video_key}/episode_{episode_index:06d}.mp4"}'
+        )
+        (ds / "data" / "chunk-000" / "episode_000000.parquet").write_text("x")
+        (ds / "videos" / "chunk-000" / "cam" / "episode_000000.mp4").write_text("y")
+
+        monkeypatch.setenv("LEROBOT_HOME", str(tmp_path))
+        # Also force HF_HUB_CACHE to a clean tmp dir so we don't accidentally
+        # hit a real cache on the developer's machine.
+        monkeypatch.setenv("HF_HUB_CACHE", str(tmp_path / "_hub"))
+
+        result = runner.invoke(app, ["inspect", "arpit/foo"])
+        # We don't fully exercise the inspector here (depends on more
+        # complete metadata), just confirm cache resolution fired and we
+        # never tried to download.
+        assert "Using cached LeRobot dataset: arpit/foo" in result.stdout
+        assert "Downloading from HuggingFace Hub" not in result.stdout
+
+    def test_lerobot_layout(self, tmp_path):
+        # Mimic ~/.cache/huggingface/lerobot/<org>/<dataset>/
+        org_dir = tmp_path / "myorg"
+        ds = org_dir / "stack_lego"
+        (ds / "meta").mkdir(parents=True)
+        (ds / "data" / "chunk-000").mkdir(parents=True)
+        (ds / "meta" / "info.json").write_text('{"codebase_version":"v2.1"}')
+        (ds / "data" / "chunk-000" / "episode_000000.parquet").write_text("x")
+
+        result = runner.invoke(
+            app, ["local", "--path", str(org_dir), "--no-detect"]
+        )
+        assert result.exit_code == 0, result.stdout
+        assert "myorg/stack_lego" in result.stdout

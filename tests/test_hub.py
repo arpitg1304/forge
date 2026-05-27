@@ -4,7 +4,14 @@ from pathlib import Path
 
 import pytest
 
-from forge.hub.download import find_in_hf_cache, get_hf_cache_dir
+from forge.hub.download import (
+    find_in_hf_cache,
+    find_in_lerobot_cache,
+    get_hf_cache_dir,
+    get_lerobot_cache_dir,
+    list_hf_cache_datasets,
+    list_local_datasets,
+)
 from forge.hub.url import HFDatasetRef, is_hf_url, parse_hf_url
 
 
@@ -196,6 +203,154 @@ class TestFindInHfCache:
         assert found.resolve() == snapshot_new_dir.resolve()
 
 
+class TestListHfCacheDatasets:
+    """Test list_hf_cache_datasets — local cache listing."""
+
+    def test_lists_populated_datasets_only_by_default(self, tmp_path):
+        _make_hf_cache(
+            tmp_path,
+            "lerobot/foo",
+            "a" * 40,
+            {"data/file.parquet": "xxxxx", "videos/cam/file.mp4": "yyyyy"},
+        )
+        _make_hf_cache(
+            tmp_path,
+            "lerobot/stub",
+            "b" * 40,
+            {"meta/info.json": "{}"},
+        )
+        results = list_hf_cache_datasets(cache_dir=tmp_path)
+        assert [d.repo_id for d in results] == ["lerobot/foo"]
+        ds = results[0]
+        assert ds.is_stub is False
+        assert ds.file_counts == {".parquet": 1, ".mp4": 1}
+        assert ds.size_bytes >= 10  # both files together
+
+    def test_includes_stubs_when_requested(self, tmp_path):
+        _make_hf_cache(
+            tmp_path, "lerobot/foo", "a" * 40, {"data/file.parquet": "x"}
+        )
+        _make_hf_cache(
+            tmp_path, "lerobot/stub", "b" * 40, {"meta/info.json": "{}"}
+        )
+        results = list_hf_cache_datasets(cache_dir=tmp_path, include_stubs=True)
+        assert [d.repo_id for d in results] == ["lerobot/foo", "lerobot/stub"]
+        stub = next(d for d in results if d.repo_id == "lerobot/stub")
+        assert stub.is_stub is True
+        assert stub.snapshot_path is None
+
+    def test_returns_empty_for_missing_dir(self, tmp_path):
+        assert list_hf_cache_datasets(cache_dir=tmp_path / "missing") == []
+
+    def test_ignores_non_dataset_folders(self, tmp_path):
+        # Model cache folders or unrelated junk should be skipped.
+        (tmp_path / "models--meta-llama--Llama").mkdir()
+        (tmp_path / "random_folder").mkdir()
+        _make_hf_cache(
+            tmp_path, "lerobot/foo", "a" * 40, {"data/file.parquet": "x"}
+        )
+        results = list_hf_cache_datasets(cache_dir=tmp_path)
+        assert [d.repo_id for d in results] == ["lerobot/foo"]
+
+    def test_sorted_by_repo_id(self, tmp_path):
+        for name in ["zeta/last", "alpha/first", "mid/middle"]:
+            _make_hf_cache(
+                tmp_path, name, name.replace("/", "") + "0" * 30,
+                {"data/file.parquet": "x"},
+            )
+        results = list_hf_cache_datasets(cache_dir=tmp_path)
+        assert [d.repo_id for d in results] == [
+            "alpha/first", "mid/middle", "zeta/last"
+        ]
+
+
+def _make_lerobot_dataset(root: Path, rel_path: str, num_episodes: int = 2) -> Path:
+    """Build a minimal lerobot-v2.1-shaped dataset directory under `root`.
+
+    The format detector recognises lerobot-v2 by presence of meta/info.json
+    plus data/chunk-*/episode_*.parquet files.
+    """
+    dataset_dir = root / rel_path
+    (dataset_dir / "meta").mkdir(parents=True)
+    (dataset_dir / "data" / "chunk-000").mkdir(parents=True)
+    (dataset_dir / "videos" / "chunk-000" / "cam").mkdir(parents=True)
+    (dataset_dir / "meta" / "info.json").write_text(
+        '{"codebase_version":"v2.1","total_episodes":' + str(num_episodes) + "}"
+    )
+    for i in range(num_episodes):
+        (dataset_dir / "data" / "chunk-000" / f"episode_{i:06d}.parquet").write_text(
+            "x" * 100
+        )
+        (dataset_dir / "videos" / "chunk-000" / "cam" / f"episode_{i:06d}.mp4").write_text(
+            "y" * 50
+        )
+    return dataset_dir
+
+
+class TestListLocalDatasetsGeneric:
+    """Tests for the generic-layout (LeRobot-style) branch."""
+
+    def test_finds_lerobot_layout_one_level_deep(self, tmp_path):
+        # Mirror `~/.cache/huggingface/lerobot/<org>/<dataset>` — user
+        # points at the org directory.
+        org_dir = tmp_path / "myorg"
+        org_dir.mkdir()
+        _make_lerobot_dataset(org_dir, "stack_lego")
+        _make_lerobot_dataset(org_dir, "place_cube")
+
+        results = list_local_datasets(cache_dir=org_dir)
+        ids = [d.repo_id for d in results]
+        assert ids == ["myorg/place_cube", "myorg/stack_lego"]
+        # Generic-layout entries are never marked as stubs.
+        assert all(not d.is_stub for d in results)
+        # File counts should be picked up from the dataset dirs themselves.
+        for d in results:
+            assert d.file_counts.get(".parquet", 0) >= 1
+            assert d.file_counts.get(".mp4", 0) >= 1
+            assert d.snapshot_path is not None and d.snapshot_path.is_dir()
+
+    def test_finds_lerobot_layout_two_levels_deep(self, tmp_path):
+        # User points at `~/.cache/huggingface/lerobot/`; datasets nest as
+        # org/repo/.
+        _make_lerobot_dataset(tmp_path, "orgA/dataset_one")
+        _make_lerobot_dataset(tmp_path, "orgB/dataset_two")
+
+        results = list_local_datasets(cache_dir=tmp_path)
+        ids = [d.repo_id for d in results]
+        assert ids == ["orgA/dataset_one", "orgB/dataset_two"]
+
+    def test_skips_empty_subdirectories(self, tmp_path):
+        # An empty subdir shouldn't be reported as a dataset.
+        (tmp_path / "empty_repo").mkdir()
+        _make_lerobot_dataset(tmp_path, "real_repo")
+
+        results = list_local_datasets(cache_dir=tmp_path)
+        assert [d.repo_id for d in results] == [f"{tmp_path.name}/real_repo"]
+
+    def test_does_not_descend_into_dataset_subdirs(self, tmp_path):
+        # Once a dataset is found at a given level, the walker shouldn't
+        # treat its data/ or meta/ subdirs as separate candidates.
+        _make_lerobot_dataset(tmp_path, "myset")
+        results = list_local_datasets(cache_dir=tmp_path)
+        assert len(results) == 1
+        assert results[0].repo_id == f"{tmp_path.name}/myset"
+
+    def test_hf_hub_layout_still_works(self, tmp_path):
+        # Sanity check: presence of any `datasets--*` folder forces the
+        # HF Hub branch even if other directories exist alongside.
+        _make_hf_cache(
+            tmp_path, "lerobot/foo", "a" * 40, {"data/file.parquet": "x"}
+        )
+        (tmp_path / "myorg" / "myset").mkdir(parents=True)
+        results = list_local_datasets(cache_dir=tmp_path)
+        assert [d.repo_id for d in results] == ["lerobot/foo"]
+
+
+def test_list_hf_cache_datasets_alias_matches_list_local_datasets():
+    # Back-compat alias should be the same callable.
+    assert list_hf_cache_datasets is list_local_datasets
+
+
 class TestGetHfCacheDir:
     """Test get_hf_cache_dir's env-var overrides."""
 
@@ -213,3 +368,41 @@ class TestGetHfCacheDir:
         monkeypatch.delenv("HUGGINGFACE_HUB_CACHE", raising=False)
         monkeypatch.setenv("HF_HOME", str(tmp_path / "hfhome"))
         assert get_hf_cache_dir() == tmp_path / "hfhome" / "hub"
+
+
+class TestGetLerobotCacheDir:
+    """Test get_lerobot_cache_dir's env-var overrides."""
+
+    def test_default(self, monkeypatch):
+        for var in ("LEROBOT_HOME", "HF_HOME"):
+            monkeypatch.delenv(var, raising=False)
+        expected = Path.home() / ".cache" / "huggingface" / "lerobot"
+        assert get_lerobot_cache_dir() == expected
+
+    def test_lerobot_home_override(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("LEROBOT_HOME", str(tmp_path / "lr"))
+        assert get_lerobot_cache_dir() == tmp_path / "lr"
+
+    def test_hf_home_override(self, monkeypatch, tmp_path):
+        monkeypatch.delenv("LEROBOT_HOME", raising=False)
+        monkeypatch.setenv("HF_HOME", str(tmp_path / "hfhome"))
+        assert get_lerobot_cache_dir() == tmp_path / "hfhome" / "lerobot"
+
+
+class TestFindInLerobotCache:
+    """Tests for the LeRobot-cache lookup used by `_resolve_via_hub`."""
+
+    def test_returns_path_for_populated_repo(self, tmp_path):
+        ds_dir = _make_lerobot_dataset(tmp_path, "arpit/foo")
+        found = find_in_lerobot_cache("arpit/foo", cache_dir=tmp_path)
+        assert found is not None
+        assert found.resolve() == ds_dir.resolve()
+
+    def test_returns_none_for_missing_repo(self, tmp_path):
+        assert find_in_lerobot_cache("nobody/nothing", cache_dir=tmp_path) is None
+
+    def test_returns_none_for_empty_dir(self, tmp_path):
+        # An existing-but-empty repo dir should not be considered a hit
+        # (matches the `eval_so101_place_cylinder` empty-stub scenario).
+        (tmp_path / "arpit" / "empty").mkdir(parents=True)
+        assert find_in_lerobot_cache("arpit/empty", cache_dir=tmp_path) is None

@@ -49,12 +49,15 @@ def _looks_like_hf_repo_id(path_str: str) -> bool:
 def _resolve_via_hub(repo_id_or_url: str) -> Path:
     """Resolve a HuggingFace dataset reference to a local path.
 
-    Prefers a populated snapshot in the local HF cache; falls back to
-    downloading via `huggingface_hub.snapshot_download`.
+    Resolution order:
+    1. Local HF Hub cache (`~/.cache/huggingface/hub/datasets--*`)
+    2. Local LeRobot cache (`~/.cache/huggingface/lerobot/<org>/<repo>/`)
+    3. Download from HuggingFace Hub
     """
     from forge.hub import (
         download_dataset,
         find_in_hf_cache,
+        find_in_lerobot_cache,
         is_hf_url,
         parse_hf_url,
     )
@@ -72,6 +75,14 @@ def _resolve_via_hub(repo_id_or_url: str) -> Path:
         )
         console.print(f"[dim]{cached}[/dim]")
         return cached
+
+    lerobot_cached = find_in_lerobot_cache(ref.repo_id)
+    if lerobot_cached is not None:
+        console.print(
+            f"[cyan]Using cached LeRobot dataset:[/cyan] {ref.repo_id}"
+        )
+        console.print(f"[dim]{lerobot_cached}[/dim]")
+        return lerobot_cached
 
     console.print(f"[cyan]Downloading from HuggingFace Hub:[/cyan] {ref.repo_id}")
     with console.status("[bold green]Downloading dataset..."):
@@ -1648,6 +1659,163 @@ def hub_cmd(
     console.print()
     console.print("[dim]To download a dataset:[/dim]")
     console.print("  forge hub --download <repo_id>")
+
+
+def _format_size(num_bytes: int) -> str:
+    """Render a byte count as a short human-readable string."""
+    if num_bytes <= 0:
+        return "-"
+    for unit in ("B", "KB", "MB", "GB", "TB"):
+        if num_bytes < 1024 or unit == "TB":
+            return f"{num_bytes:.1f} {unit}" if unit != "B" else f"{num_bytes} B"
+        num_bytes /= 1024
+    return f"{num_bytes:.1f} TB"
+
+
+@app.command("local")
+def local_cmd(
+    path: Path | None = typer.Option(
+        None,
+        "--path",
+        "-p",
+        help="Cache directory to scan. Defaults to the HuggingFace Hub cache "
+        "(~/.cache/huggingface/hub, or $HF_HUB_CACHE/$HF_HOME if set).",
+    ),
+    all_entries: bool = typer.Option(
+        False,
+        "--all",
+        "-a",
+        help="Include metadata-only stubs (repos forge cannot actually load).",
+    ),
+    output: str = typer.Option(
+        "text", "--output", "-o", help="Output format: text, json"
+    ),
+    detect: bool = typer.Option(
+        True,
+        "--detect/--no-detect",
+        help="Detect each dataset's format. Disable for a faster listing on "
+        "very large caches.",
+    ),
+) -> None:
+    """List datasets already present in a local HuggingFace-style cache.
+
+    Scans the standard HF Hub cache by default and shows every dataset
+    that has data files on disk (not just metadata stubs). Pass `--path`
+    to point at a different cache root.
+
+    Examples:
+        forge local
+        forge local --all
+        forge local --path /data/hf_cache
+        forge local --output json
+    """
+    from forge.hub import get_hf_cache_dir, list_local_datasets
+
+    cache_root = path if path is not None else get_hf_cache_dir()
+    if not cache_root.is_dir():
+        console.print(
+            f"[yellow]Cache directory does not exist:[/yellow] {cache_root}"
+        )
+        raise typer.Exit(0 if output == "text" else 1)
+
+    datasets = list_local_datasets(cache_dir=cache_root, include_stubs=all_entries)
+
+    # Resolve format per dataset (best-effort).
+    formats: dict[str, str] = {}
+    if detect:
+        from forge.core.exceptions import ForgeError
+        from forge.formats.registry import FormatRegistry
+
+        for ds in datasets:
+            if ds.snapshot_path is None:
+                continue
+            try:
+                formats[ds.repo_id] = FormatRegistry.detect_format(ds.snapshot_path)
+            except (ForgeError, Exception):
+                formats[ds.repo_id] = "unknown"
+
+    if output == "json":
+        data = {
+            "cache_dir": str(cache_root),
+            "count": len(datasets),
+            "datasets": [
+                {
+                    "repo_id": ds.repo_id,
+                    "snapshot_path": str(ds.snapshot_path) if ds.snapshot_path else None,
+                    "size_bytes": ds.size_bytes,
+                    "file_counts": ds.file_counts,
+                    "is_stub": ds.is_stub,
+                    "format": formats.get(ds.repo_id),
+                }
+                for ds in datasets
+            ],
+        }
+        # Use plain print, not console.print, so Rich doesn't wrap long
+        # paths and break json parsing.
+        print(json.dumps(data, indent=2))
+        return
+
+    console.print(f"[bold]Cache:[/bold] {cache_root}")
+
+    if not datasets:
+        if all_entries:
+            console.print("[yellow]No dataset folders found.[/yellow]")
+        else:
+            console.print(
+                "[yellow]No populated datasets found.[/yellow] "
+                "Pass [bold]--all[/bold] to also list metadata-only stubs."
+            )
+        return
+
+    table = Table(title=f"Local Datasets ({len(datasets)})")
+    table.add_column("Repository", style="cyan", no_wrap=True)
+    table.add_column("Size", justify="right", no_wrap=True)
+    if detect:
+        table.add_column("Format", no_wrap=True)
+    # Compact "kinds" column — list which media types are present without
+    # repeating per-extension counts (which already wrap badly on long ids).
+    table.add_column("Kinds", no_wrap=True, overflow="ellipsis")
+
+    total_bytes = 0
+    for ds in datasets:
+        total_bytes += ds.size_bytes
+        size_str = _format_size(ds.size_bytes)
+        if ds.is_stub:
+            size_str = "[dim]stub[/dim]"
+
+        if ds.file_counts:
+            kinds = ", ".join(ext.lstrip(".") for ext in sorted(ds.file_counts))
+        else:
+            kinds = "[dim]—[/dim]"
+
+        if detect:
+            fmt = formats.get(ds.repo_id, "—")
+            if ds.is_stub:
+                fmt = "[dim]—[/dim]"
+            table.add_row(ds.repo_id, size_str, fmt, kinds)
+        else:
+            table.add_row(ds.repo_id, size_str, kinds)
+
+    console.print(table)
+    console.print(
+        f"[dim]Total: {_format_size(total_bytes)} across {len(datasets)} datasets[/dim]"
+    )
+    console.print()
+
+    # Pick an example to make the hint copy-pasteable. For HF Hub layout we
+    # can use the repo_id directly; for generic layouts we need the full
+    # path because the repo_id is just a display label.
+    from forge.hub.download import _is_hf_hub_cache_root
+
+    example_ds = next((d for d in datasets if d.snapshot_path is not None), None)
+    if example_ds is not None and _is_hf_hub_cache_root(cache_root):
+        console.print(
+            f"[dim]Inspect a dataset with:[/dim] forge inspect {example_ds.repo_id}"
+        )
+    elif example_ds is not None:
+        console.print(
+            f"[dim]Inspect a dataset with:[/dim] forge inspect {example_ds.snapshot_path}"
+        )
 
 
 @app.command("quality")
