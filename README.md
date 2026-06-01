@@ -117,6 +117,7 @@ forge convert hf://lerobot/pusht ./output --format lerobot-v3
 | Zarr from Diffusion Policy | LeRobot v3 | `forge convert pusht.zarr ./out --format lerobot-v3` |
 | Any supported format | Quality scores per episode | `forge quality ./dataset` |
 | Any supported format | Filter out bad demos | `forge filter ./dataset ./clean --min-quality 6.0` |
+| Continuous actions | Discrete action tokens for VLA training | `forge tokenize write ./dataset ./tokenized --strategy openvla-bins` |
 
 ## Python API
 
@@ -230,6 +231,21 @@ forge segment ./my_dataset --sample 20
 Detects where the statistical properties of the proprio signal change abruptly — e.g., transitions between reaching, grasping, and placing phases. Configurable cost models (`rbf`, `l2`, `l1`), penalty methods (`bic`, `aic`, or numeric), and signal selection (`observation.state`, `action`, `qpos`).
 
 See [forge/segment/README.md](forge/segment/README.md) for full details.
+
+## Action Tokenization
+
+Turn continuous action vectors into discrete tokens (and back) for VLA / robot-learning models, which predict discrete action tokens rather than continuous vectors. Proven strategies ship in-box; a comparator benchmarks them on *your* dataset so you don't have to guess.
+
+```bash
+forge tokenize list                                                  # registered strategies
+forge tokenize compare ./my_dataset --sample 20 --export report.json # benchmark recon error / vocab util
+forge tokenize fit ./my_dataset --strategy openvla-bins --out tok.json
+forge tokenize write ./my_dataset ./tokenized --strategy openvla-bins  # LeRobot v3 + action_tokens column
+```
+
+Built-in strategies: `uniform-bins` (RT-1), `openvla-bins` (OpenVLA), `quantile-bins`, and `mu-law` — all per-step and numpy-only. `write` saves the fitted tokenizer to `meta/action_tokenizer.json` for inference-time detokenization. Add your own strategy with a one-line registry decorator.
+
+See [forge/tokenize/README.md](forge/tokenize/README.md) for full details and the extension API.
 
 ## Visualization
 

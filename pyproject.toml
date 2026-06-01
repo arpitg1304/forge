@@ -76,8 +76,15 @@ segment = [
 rerun = [
     "rerun-sdk>=0.16.0",
 ]
+tokenize-fast = [
+    "scipy>=1.10.0",
+    "tokenizers>=0.15.0",
+]
+tokenize-learned = [
+    "scikit-learn>=1.3.0",
+]
 all = [
-    "forge-robotics[rlds,lerobot,zarr,rosbag,mcap,hdf5,robodm,video,hub,visualize,registry,segment,rerun]",
+    "forge-robotics[rlds,lerobot,zarr,rosbag,mcap,hdf5,robodm,video,hub,visualize,registry,segment,rerun,tokenize-fast,tokenize-learned]",
 ]
 dev = [
     "pytest>=7.4.0",
