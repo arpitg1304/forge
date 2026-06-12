@@ -15,6 +15,9 @@ from forge.quality.metrics import (
     gripper_chatter,
     log_dimensionless_jerk,
     path_length,
+    psd_band_energy,
+    spectral_arc_length,
+    state_conditioned_action_variance,
     static_detection,
     timestamp_regularity,
 )
@@ -310,6 +313,125 @@ class TestActionEntropy:
         actions = rng.uniform(-1, 1, (1000, 7))
         _, mean_ent = action_entropy(actions)
         assert mean_ent > 0.7  # Should be high entropy
+
+
+class TestSpectralArcLength:
+    def test_smooth_vs_noisy(self):
+        t = np.linspace(0, 2 * np.pi, 200)
+        smooth = np.column_stack([np.sin(t), np.cos(t)])
+        rng = np.random.RandomState(42)
+        noisy = smooth + rng.randn(200, 2) * 0.3
+        s_smooth = spectral_arc_length(smooth, dt=1 / 30.0)
+        s_noisy = spectral_arc_length(noisy, dt=1 / 30.0)
+        assert s_smooth is not None and s_noisy is not None
+        # More negative = jerkier; noisy should be more negative.
+        assert s_noisy < s_smooth
+
+    def test_too_short(self):
+        positions = np.array([[0.0, 0.0], [1.0, 1.0]])
+        assert spectral_arc_length(positions, dt=1 / 30.0) is None
+
+    def test_static_returns_none(self):
+        positions = np.ones((100, 3))
+        assert spectral_arc_length(positions, dt=1 / 30.0) is None
+
+    def test_agrees_with_ldlj_direction(self):
+        """SPARC and LDLJ should agree on which trajectory is jerkier."""
+        t = np.linspace(0, 2 * np.pi, 200)
+        smooth = np.column_stack([np.sin(t), np.cos(t)])
+        rng = np.random.RandomState(0)
+        noisy = smooth + rng.randn(200, 2) * 0.5
+        ldlj_d = log_dimensionless_jerk(noisy, dt=1 / 30.0) - log_dimensionless_jerk(
+            smooth, dt=1 / 30.0
+        )
+        sparc_d = spectral_arc_length(noisy, dt=1 / 30.0) - spectral_arc_length(
+            smooth, dt=1 / 30.0
+        )
+        # Both deltas should be negative (noisy worse than smooth).
+        assert ldlj_d < 0 and sparc_d < 0
+
+
+class TestPsdBandEnergy:
+    def test_low_band_dominates_smooth(self):
+        t = np.linspace(0, 4 * np.pi, 600)
+        # 0.5 Hz sinusoid at fs=30 → almost all energy in low band (<2 Hz).
+        actions = np.column_stack([np.sin(0.5 * 2 * np.pi * t / (4 * np.pi)) for _ in range(3)])
+        bands = psd_band_energy(actions, fps=30.0)
+        assert bands is not None
+        assert bands["low_fraction"] > 0.9
+        assert bands["high_fraction"] < 0.05
+
+    def test_high_band_dominates_chatter(self):
+        # Pure 12 Hz signal at fs=30 → energy in high band (>8 Hz).
+        t = np.arange(600) / 30.0
+        actions = np.column_stack([np.sin(2 * np.pi * 12 * t) for _ in range(3)])
+        bands = psd_band_energy(actions, fps=30.0)
+        assert bands is not None
+        assert bands["high_fraction"] > 0.9
+        assert bands["low_fraction"] < 0.05
+
+    def test_per_dim_lists_have_right_shape(self):
+        rng = np.random.RandomState(0)
+        actions = rng.randn(300, 5)
+        bands = psd_band_energy(actions, fps=30.0)
+        assert bands is not None
+        for key in ("low_fraction_per_dim", "mid_fraction_per_dim", "high_fraction_per_dim"):
+            assert len(bands[key]) == 5
+
+    def test_too_short_returns_none(self):
+        assert psd_band_energy(np.zeros((3, 4)), fps=30.0) is None
+
+    def test_unresolvable_bands_returns_none(self):
+        # fps=2 → nyquist=1, can't resolve a 2 Hz low-band edge.
+        assert psd_band_energy(np.zeros((200, 4)), fps=2.0) is None
+
+    def test_high_band_above_nyquist_returns_none(self):
+        # fps=10 → nyquist=5 Hz < 8 Hz high-band edge. Chatter aliases into
+        # lower bands, so a high_fraction of 0 would be a false negative.
+        t = np.arange(200) / 10.0
+        actions = np.column_stack([np.sin(2 * np.pi * t)] * 4)
+        assert psd_band_energy(actions, fps=10.0) is None
+
+
+class TestStateConditionedActionVariance:
+    def test_identical_states_zero_variance(self):
+        # 200 frames of the same state with the same action → all neighbors
+        # have identical actions → variance == 0.
+        states = np.tile(np.array([1.0, 2.0, 3.0, 4.0]), (200, 1))
+        actions = np.tile(np.array([0.5, -0.5, 0.0]), (200, 1))
+        _, mean_var = state_conditioned_action_variance(states, actions, k=5)
+        assert mean_var is not None
+        assert mean_var == 0.0
+
+    def test_inconsistent_demo_high_variance(self):
+        # Same state distribution but random unrelated actions → high variance.
+        rng = np.random.RandomState(0)
+        states = rng.randn(200, 4)
+        actions = rng.randn(200, 3)
+        _, mean_var = state_conditioned_action_variance(states, actions, k=5)
+        assert mean_var is not None
+        assert mean_var > 0.1
+
+    def test_consistent_lower_than_inconsistent(self):
+        rng = np.random.RandomState(1)
+        states = rng.randn(200, 4)
+        consistent_actions = states[:, :3] * 1.5
+        random_actions = rng.randn(200, 3)
+        _, v_consistent = state_conditioned_action_variance(states, consistent_actions, k=5)
+        _, v_random = state_conditioned_action_variance(states, random_actions, k=5)
+        assert v_consistent < v_random
+
+    def test_too_short_returns_none(self):
+        states = np.zeros((4, 3))
+        actions = np.zeros((4, 2))
+        per_frame, mean_var = state_conditioned_action_variance(states, actions, k=5)
+        assert per_frame is None and mean_var is None
+
+    def test_mismatched_lengths_returns_none(self):
+        states = np.zeros((100, 3))
+        actions = np.zeros((99, 2))
+        per_frame, mean_var = state_conditioned_action_variance(states, actions, k=5)
+        assert per_frame is None and mean_var is None
 
 
 class TestCompositeScore:

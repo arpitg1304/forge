@@ -31,7 +31,7 @@ if not any(FIXTURES.glob("*.mcap")):
 def test_inspect_trossen_protobuf_profile_empty() -> None:
     inv = inspect_mcap(FIXTURES / "trossen_transfer_cube.mcap")
     assert inv.profile == ""  # Foxglove protobuf — no ros2 profile
-    assert inv.total_messages == 8301
+    assert inv.total_messages == 37158
     schemas = {c.schema_name for c in inv.channels}
     assert "schemas.proto.JointState" in schemas
     assert "foxglove.CompressedVideo" in schemas

@@ -23,17 +23,23 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEST = REPO_ROOT / "sample_data" / "mcap"
 
+# Pinned to a specific rerun commit so upstream changes to the recordings
+# can't silently break our test assertions (which encode file-specific facts
+# like message counts). To bump: update the SHA, re-run with --force, and
+# refresh tests/fixtures/mcap/INVENTORY.md plus any affected assertions.
+RERUN_SHA = "e8386c5f5434c4c0d3f1c7dac7dbfe1a9b1a7bb4"
+
 FIXTURES: dict[str, str] = {
     "r2b_galileo.mcap": (
-        "https://github.com/rerun-io/rerun/raw/main/"
+        f"https://github.com/rerun-io/rerun/raw/{RERUN_SHA}/"
         "tests/assets/mcap/r2b_galileo.mcap"
     ),
     "trossen_transfer_cube.mcap": (
-        "https://github.com/rerun-io/rerun/raw/main/"
+        f"https://github.com/rerun-io/rerun/raw/{RERUN_SHA}/"
         "tests/assets/mcap/trossen_transfer_cube.mcap"
     ),
     "supported_ros2_messages.mcap": (
-        "https://github.com/rerun-io/rerun/raw/main/"
+        f"https://github.com/rerun-io/rerun/raw/{RERUN_SHA}/"
         "crates/store/re_importer/tests/assets/supported_ros2_messages.mcap"
     ),
 }

@@ -17,6 +17,9 @@ from forge.quality.metrics import (
     gripper_chatter,
     log_dimensionless_jerk,
     path_length,
+    psd_band_energy,
+    spectral_arc_length,
+    state_conditioned_action_variance,
     static_detection,
     timestamp_regularity,
 )
@@ -110,6 +113,19 @@ class QualityAnalyzer:
             ent_per_dim, eq.mean_entropy = action_entropy(actions)
             eq.entropy_per_dim = ent_per_dim.tolist()
 
+            # 9b. PSD band energy (generalized chatter across all action dims)
+            bands = psd_band_energy(
+                actions,
+                effective_fps,
+                low_hz=self.config.psd_low_hz,
+                high_hz=self.config.psd_high_hz,
+            )
+            if bands is not None:
+                eq.psd_bands = bands
+                eq.psd_high_fraction = bands["high_fraction"]
+                if bands["high_fraction"] > self.config.psd_high_flag:
+                    eq.flags.append("psd_high_band_chatter")
+
         # ── State-based metrics ──
         if states is not None and states.size > 0:
             if np.any(~np.isfinite(states)):
@@ -119,12 +135,32 @@ class QualityAnalyzer:
             # 2. LDLJ smoothness (joint space)
             eq.ldlj = log_dimensionless_jerk(states, dt)
 
+            # 9a. SPARC smoothness (frequency-domain complement to LDLJ)
+            eq.sparc = spectral_arc_length(states, dt)
+
             # 4. Path length (joint space)
             eq.joint_path_length = path_length(states)
 
-        # If no states but actions available, compute LDLJ from actions
-        if eq.ldlj is None and actions is not None and actions.size > 0:
-            eq.ldlj = log_dimensionless_jerk(actions, dt)
+        # If no states but actions available, compute LDLJ + SPARC from actions
+        if actions is not None and actions.size > 0:
+            if eq.ldlj is None:
+                eq.ldlj = log_dimensionless_jerk(actions, dt)
+            if eq.sparc is None:
+                eq.sparc = spectral_arc_length(actions, dt)
+
+        # 9c. State-conditioned action variance (proprio STAC analogue) —
+        # needs both states and actions of matching length.
+        if (
+            states is not None
+            and actions is not None
+            and states.size > 0
+            and actions.size > 0
+            and len(states) == len(actions)
+        ):
+            _per_frame, mean_var = state_conditioned_action_variance(
+                states, actions, k=self.config.state_action_k
+            )
+            eq.state_action_consistency = mean_var
 
         # ── Timestamp metrics ──
         if timestamps is not None and len(timestamps) > 1:
@@ -307,6 +343,13 @@ def _generate_recommendations(
     if "saturated" in flagged:
         n = len(flagged["saturated"])
         flags.append(f"{n} episodes with action saturation (>30% at bounds)")
+
+    if "psd_high_band_chatter" in flagged:
+        n = len(flagged["psd_high_band_chatter"])
+        flags.append(
+            f"{n} episodes with high-frequency action chatter "
+            f"(>{int(config.psd_high_flag * 100)}% energy above {config.psd_high_hz:g} Hz)"
+        )
 
     if report.overall_score < 6.0 and report.num_episodes > 0:
         recs.append(

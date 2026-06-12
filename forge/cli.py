@@ -2010,6 +2010,40 @@ def quality_cmd(
             flag_str = f"  {flagged_count} flagged" if flagged_count > 0 else "  OK"
             lines.append(f"{label:<24} {bar}  {val:.2f}{flag_str}")
 
+    # Additional signals \u2014 surfaced for inspection but not part of the
+    # composite score (different scales: SPARC is negative, PSD a fraction,
+    # state-action variance unbounded positive).
+    def _collect(attr: str) -> list[float]:
+        return [
+            getattr(eq, attr)
+            for eq in report.per_episode
+            if getattr(eq, attr) is not None
+        ]
+
+    sparc_vals = _collect("sparc")
+    psd_vals = _collect("psd_high_fraction")
+    sa_vals = _collect("state_action_consistency")
+
+    if sparc_vals or psd_vals or sa_vals:
+        lines.append("")
+        lines.append("[bold]Additional Signals[/bold] [dim](not in composite)[/dim]")
+        if sparc_vals:
+            lines.append(
+                f"  SPARC smoothness         mean={np.mean(sparc_vals):+.2f}  "
+                f"[dim](more negative = jerkier; complement to LDLJ)[/dim]"
+            )
+        if psd_vals:
+            n_flag = len(report.flagged_episodes.get("psd_high_band_chatter", []))
+            flag_str = f"  [yellow]{n_flag} flagged[/yellow]" if n_flag else "  OK"
+            lines.append(
+                f"  PSD high-band fraction   mean={np.mean(psd_vals):.3f}{flag_str}"
+            )
+        if sa_vals:
+            lines.append(
+                f"  State-action variance    mean={np.mean(sa_vals):.3f}  "
+                f"[dim](range {np.min(sa_vals):.2f}\u2013{np.max(sa_vals):.2f})[/dim]"
+            )
+
     # Top issues
     if report.flags:
         lines.append("")
