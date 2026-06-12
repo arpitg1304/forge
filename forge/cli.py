@@ -2440,6 +2440,121 @@ def registry_validate_cmd(
         raise typer.Exit(1)
 
 
+@app.command("lint")
+def lint_cmd(
+    path: str = typer.Argument(..., help="Path to dataset (local or hf://org/repo)"),
+    export: Path | None = typer.Option(
+        None, "--export", "-e", help="Export the full lint report to JSON"
+    ),
+    strict: bool = typer.Option(
+        False, "--strict", help="Exit non-zero on warnings too, not just errors"
+    ),
+    max_examples: int = typer.Option(
+        5, "--max-examples", help="Per-code episode examples to print (0 = all)"
+    ),
+) -> None:
+    """Check a dataset against Hugging Face's recording guidelines.
+
+    Flags hygiene defects that degrade training or downstream tooling: missing
+    or low-coverage task instructions, placeholder/too-short task strings,
+    ambiguous camera naming, low-resolution or single-view camera setups, and
+    missing action fields. Pure metadata inspection (uses the reader's
+    `inspect`, no video decode). Exits non-zero if any ERROR is found (add
+    --strict to also fail on warnings).
+
+    Examples:
+        forge lint ./dataset
+        forge lint hf://lerobot/pusht --export lint.json
+        forge lint ./dataset --strict
+    """
+    import json as _json
+
+    from forge.core.exceptions import ForgeError
+    from forge.formats.registry import FormatRegistry
+    from forge.lint import DatasetLinter
+
+    resolved_path = _resolve_dataset_path(path)
+    if not resolved_path.exists():
+        console.print(f"[red]Error:[/red] Dataset not found: {resolved_path}")
+        raise typer.Exit(1)
+
+    try:
+        format_name = FormatRegistry.detect_format(resolved_path)
+        reader = FormatRegistry.get_reader(format_name)
+    except ForgeError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1)
+
+    console.print(f"[cyan]Linting:[/cyan] {path}")
+    console.print(f"[dim]Format: {format_name}[/dim]")
+    console.print()
+
+    try:
+        info = reader.inspect(resolved_path)
+    except ForgeError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1)
+
+    linter = DatasetLinter(reader=reader)
+    report = linter.lint_metadata(info, dataset_path=str(path))
+
+    _color = {"error": "red", "warn": "yellow", "info": "dim"}
+    if report.issues:
+        # Group by code so a defect across 500 episodes prints once, not 500x.
+        from collections import defaultdict
+
+        by_code: dict[str, list] = defaultdict(list)
+        for issue in report.issues:
+            by_code[issue.code].append(issue)
+
+        # Errors first, then warnings, then info.
+        order = {"error": 0, "warn": 1, "info": 2}
+        for code in sorted(
+            by_code, key=lambda c: (order[by_code[c][0].severity.value], c)
+        ):
+            issues = by_code[code]
+            sev = issues[0].severity.value
+            color = _color[sev]
+            scoped = [i for i in issues if i.scope != "dataset"]
+            count = (
+                f"  ({len(scoped)} episode{'s' if len(scoped) != 1 else ''})"
+                if scoped
+                else ""
+            )
+            console.print(
+                f"[{color}]{sev.upper():<5}[/{color}] [bold]{code}[/bold]{count}"
+            )
+            console.print(f"        {issues[0].message}")
+            if issues[0].hint:
+                console.print(f"        [dim]→ {issues[0].hint}[/dim]")
+            if scoped and len(scoped) > 1:
+                shown = scoped if max_examples == 0 else scoped[:max_examples]
+                ids = ", ".join(i.scope for i in shown)
+                more = len(scoped) - len(shown)
+                suffix = f" … (+{more} more)" if more > 0 else ""
+                console.print(f"        [dim]e.g. {ids}{suffix}[/dim]")
+            console.print()
+
+    n_err, n_warn, n_info = (
+        len(report.errors),
+        len(report.warnings),
+        len(report.infos),
+    )
+    status = "[green]PASS[/green]" if report.passed else "[red]FAIL[/red]"
+    console.print(
+        f"{status}  {report.num_episodes} episodes  "
+        f"[red]{n_err} errors[/red], [yellow]{n_warn} warnings[/yellow], "
+        f"[dim]{n_info} info[/dim]"
+    )
+
+    if export:
+        export.write_text(_json.dumps(report.to_dict(), indent=2))
+        console.print(f"[dim]Report written to {export}[/dim]")
+
+    if n_err > 0 or (strict and n_warn > 0):
+        raise typer.Exit(1)
+
+
 @app.command("demo")
 def demo_cmd(
     dataset_id: str | None = typer.Argument(
