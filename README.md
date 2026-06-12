@@ -22,7 +22,7 @@
 <code>MCAP ═══╝         ╚═══► RLDS</code>
 </p>
 
-Convert between robotics dataset formats with one command. Score demonstration quality with research-backed metrics. Segment episodes into sub-skills with changepoint detection.
+Convert between robotics dataset formats with one command. Score demonstration quality with research-backed metrics. Lint datasets for hygiene defects before training. Segment episodes into sub-skills with changepoint detection.
 
 | Format | Read | Write | Visualize | Notes |
 |--------|:----:|:-----:|:---------:|-------|
@@ -116,6 +116,7 @@ forge convert hf://lerobot/pusht ./output --format lerobot-v3
 | HDF5 from ALOHA / robomimic | MCAP for Foxglove playback | `forge convert aloha.hdf5 ./out --format mcap` |
 | Zarr from Diffusion Policy | LeRobot v3 | `forge convert pusht.zarr ./out --format lerobot-v3` |
 | Any supported format | Quality scores per episode | `forge quality ./dataset` |
+| Any supported format | Lint for hygiene defects | `forge lint ./dataset` |
 | Any supported format | Filter out bad demos | `forge filter ./dataset ./clean --min-quality 6.0` |
 | Continuous actions | Discrete action tokens for VLA training | `forge tokenize write ./dataset ./tokenized --strategy openvla-bins` |
 
@@ -170,6 +171,20 @@ forge filter ./my_dataset ./filtered --from-report report.json       # Skip re-a
 ```
 
 See [forge/filter/README.md](forge/filter/README.md) for full details.
+
+## Dataset Linting
+
+Check a dataset against Hugging Face's published [LeRobot recording guidelines](https://huggingface.co/blog/lerobot-datasets) and flag hygiene defects *before* you spend GPU-hours training on it. Where `forge quality` scores trajectory *content* (smoothness, dead actions, chatter), `forge lint` checks *hygiene*: missing or placeholder task strings, ambiguous camera naming, low-resolution or single-view setups, and missing action fields.
+
+```bash
+forge lint ./my_dataset
+forge lint hf://lerobot/pusht --export lint.json
+forge lint ./my_dataset --strict                                     # fail on warnings too, not just errors
+```
+
+Runs against the reader's inspected metadata — no video decode, no full episode scan. Exits non-zero on any error (or any warning under `--strict`), so it drops straight into CI.
+
+See [forge/lint/README.md](forge/lint/README.md) for the full check list and thresholds.
 
 ## Dataset Registry
 

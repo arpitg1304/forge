@@ -761,6 +761,18 @@
       </div>
     </div>
 
+    <!-- Lint -->
+    <div class="feature-card c-rose">
+      <div class="feature-icon rose">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      </div>
+      <div class="feature-title">Dataset Linting</div>
+      <div class="feature-desc">Catch hygiene defects before you train: missing or placeholder task strings, ambiguous camera names, low-res or single-view setups, missing action fields. Enforces Hugging Face's recording guidelines &mdash; CI-friendly exit codes.</div>
+      <div class="feature-code">
+        <span class="prompt">$ </span><span class="cmd">forge lint</span> <span class="arg">./my_dataset</span> <span class="flag">--strict</span>
+      </div>
+    </div>
+
     <!-- Filter -->
     <div class="feature-card c-orange">
       <div class="feature-icon orange">
@@ -892,6 +904,33 @@
 <span class="t-border">│</span>  Action Diversity       <span class="t-bar">███</span><span class="t-bar-empty">░░░░░░░</span>  <span class="t-cyan">0.30</span>  <span class="t-green">OK</span>        <span class="t-border">│</span>
 <span class="t-border">│</span>                                                       <span class="t-border">│</span>
 <span class="t-border">╰───────────────────────────────────────────────────────╯</span></div>
+    </div>
+
+    <!-- Lint -->
+    <div class="terminal">
+      <div class="terminal-bar">
+        <div class="terminal-dot red"></div>
+        <div class="terminal-dot yellow"></div>
+        <div class="terminal-dot green"></div>
+        <div class="terminal-title">forge lint</div>
+      </div>
+      <div class="terminal-body"><span class="t-prompt">$ </span><span class="t-cmd">forge lint hf://lerobot/pusht</span>
+
+<span class="t-yellow">WARN</span>  <span class="t-bold">camera.ambiguous_name</span>
+        Camera 'image' doesn't say where it is (third-person vs wrist?).
+        <span class="t-dim">→ Use &lt;modality&gt;.&lt;location&gt;, e.g. 'observation.images.wrist'.</span>
+
+<span class="t-yellow">WARN</span>  <span class="t-bold">task.missing</span>
+        Dataset has no language / task instructions.
+        <span class="t-dim">→ VLA training needs per-episode instructions; add them.</span>
+
+<span class="t-dim">INFO</span>  <span class="t-bold">camera.low_resolution</span>
+        Camera 'image' is 96x96; below 640x480.
+
+<span class="t-dim">INFO</span>  <span class="t-bold">camera.too_few_views</span>
+        Only 1 camera view(s); HF recommends &gt;= 2.
+
+<span class="t-green">PASS</span>  206 episodes  <span class="t-dim">0 errors,</span> <span class="t-yellow">2 warnings,</span> <span class="t-dim">2 info</span></div>
     </div>
 
     <!-- Segment -->
