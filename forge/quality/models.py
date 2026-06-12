@@ -68,6 +68,16 @@ class EpisodeQuality:
     entropy_per_dim: list[float] | None = None
     mean_entropy: float | None = None
 
+    # Metric 9a: SPARC smoothness (frequency-domain alternative to LDLJ)
+    sparc: float | None = None
+
+    # Metric 9b: PSD band energy — high_fraction is the headline chatter scalar
+    psd_high_fraction: float | None = None
+    psd_bands: dict | None = None
+
+    # Metric 9c: State-conditioned action variance (proprio cousin of STAC)
+    state_action_consistency: float | None = None
+
     # Metric 10: Composite score
     overall_score: float | None = None
     subscores: dict[str, float] = field(default_factory=dict)
@@ -83,11 +93,14 @@ class EpisodeQuality:
             "num_frames": self.num_frames,
             "overall_score": self.overall_score,
             "ldlj": self.ldlj,
+            "sparc": self.sparc,
             "dead_fraction": self.dead_fraction,
             "gripper_chatter_rate": self.gripper_chatter_rate,
             "joint_path_length": self.joint_path_length,
             "overall_saturation": self.overall_saturation,
             "mean_entropy": self.mean_entropy,
+            "psd_high_fraction": self.psd_high_fraction,
+            "state_action_consistency": self.state_action_consistency,
             "flags": self.flags,
         }
         if self.static is not None:
@@ -161,10 +174,13 @@ class QualityReport:
                 overall_score=ep_data.get("overall_score"),
                 dead_fraction=ep_data.get("dead_fraction"),
                 ldlj=ep_data.get("ldlj"),
+                sparc=ep_data.get("sparc"),
                 gripper_chatter_rate=ep_data.get("gripper_chatter_rate"),
                 joint_path_length=ep_data.get("joint_path_length"),
                 overall_saturation=ep_data.get("overall_saturation"),
                 mean_entropy=ep_data.get("mean_entropy"),
+                psd_high_fraction=ep_data.get("psd_high_fraction"),
+                state_action_consistency=ep_data.get("state_action_consistency"),
                 flags=ep_data.get("flags", []),
             )
             report.per_episode.append(eq)

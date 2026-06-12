@@ -5,10 +5,13 @@ No video/image processing — proprioception only.
 
 References:
     - Hogan & Sternad (2009) — LDLJ smoothness metric
+    - Balasubramanian et al. (2012, 2015) — SPARC (spectral arc length)
     - Sakr et al. "Consistency Matters" (ACM THRI, 2024) — path length, manipulability
     - Belkhale et al. "DemInf" (2025) — action entropy
     - Liu et al. "SCIZOR" (2025) — static episode detection
     - Kim et al. "OpenVLA" (2024) — dead action filtering
+    - Lee et al. "Sentinel" (2024) — STAC (temporal action consistency);
+      we adapt the spirit to proprio as state-conditioned action variance
 """
 
 from __future__ import annotations
@@ -301,6 +304,198 @@ def action_entropy(actions: NDArray) -> tuple[NDArray, float]:
 
     mean_entropy = float(np.mean(entropy_per_dim))
     return entropy_per_dim, mean_entropy
+
+
+# ── Metric 9a: SPARC (Spectral Arc Length) ──────────────────────
+
+
+def spectral_arc_length(
+    positions: NDArray,
+    dt: float,
+    *,
+    pad_level: int = 4,
+    fc_max: float = 10.0,
+    amp_thresh: float = 0.05,
+) -> float | None:
+    """Compute SPARC smoothness — Balasubramanian et al. 2012/2015.
+
+    Spectral arc length of the speed-profile magnitude spectrum. More negative
+    = jerkier. Complements LDLJ: LDLJ is time-domain (jerk integral), SPARC is
+    frequency-domain (spectrum geometry) — disagreement between the two is a
+    useful confidence signal.
+
+    Args:
+        positions: Shape (T, D) position array (joint angles or EE pose).
+        dt: Time step in seconds.
+        pad_level: Zero-pad to ``2^(ceil(log2(T)) + pad_level)`` for FFT
+            resolution. Default 4 matches the reference implementation.
+        fc_max: Hard upper bound on the adaptive cutoff (Hz). Default 10 Hz
+            covers typical manipulation; raise for high-bandwidth tasks.
+        amp_thresh: Adaptive cutoff = highest frequency where normalized
+            spectrum amplitude is still above this threshold. Default 0.05.
+
+    Returns:
+        SPARC score, or None if input too short or speed is identically zero.
+    """
+    if len(positions) < 4 or dt <= 0:
+        return None
+
+    velocity = np.gradient(positions, dt, axis=0)
+    speed = (
+        np.linalg.norm(velocity, axis=1) if velocity.ndim == 2 else np.abs(velocity)
+    )
+    if speed.size < 4 or float(np.max(speed)) < 1e-12:
+        return None
+
+    n = int(2 ** (int(np.ceil(np.log2(len(speed)))) + pad_level))
+    spectrum = np.abs(np.fft.rfft(speed, n=n))
+    freq = np.fft.rfftfreq(n, d=dt)
+
+    spec_max = float(spectrum.max())
+    if spec_max < 1e-12:
+        return None
+    spec_n = spectrum / spec_max
+
+    # Adaptive cutoff: highest freq still above threshold, capped at fc_max.
+    above = np.where(spec_n >= amp_thresh)[0]
+    if above.size == 0:
+        return None
+    fc = float(min(freq[above[-1]], fc_max))
+    if fc <= 0:
+        return None
+
+    mask = freq <= fc
+    f = freq[mask]
+    s = spec_n[mask]
+    if f.size < 2:
+        return None
+
+    # Discretized arc length of the normalized spectrum curve, with the freq
+    # axis rescaled by 1/fc so the integral is dimensionless and bounded.
+    df = np.diff(f) / fc
+    ds = np.diff(s)
+    arc = float(np.sum(np.sqrt(df * df + ds * ds)))
+    return -arc
+
+
+# ── Metric 9b: PSD band energy ──────────────────────────────────
+
+
+def psd_band_energy(
+    actions: NDArray,
+    fps: float,
+    *,
+    low_hz: float = 2.0,
+    high_hz: float = 8.0,
+) -> dict[str, Any] | None:
+    """Power-spectral-density of actions split into low / mid / high bands.
+
+    Generalizes ``gripper_chatter`` to every action dim: chatter is just
+    excess energy in the high-frequency band. Typical clean teleop sits
+    almost entirely in the low band (<2 Hz); excess high-band power
+    indicates overcorrection, jitter, or controller resonance.
+
+    Args:
+        actions: Shape (T, D) action array.
+        fps: Sample rate in Hz.
+        low_hz: Upper edge of the low band (default 2 Hz).
+        high_hz: Lower edge of the high band (default 8 Hz). Mid band is
+            the gap between low_hz and high_hz.
+
+    Returns:
+        Dict with overall and per-dim band fractions, or None if fps is
+        too low to resolve the requested bands.
+    """
+    if actions.ndim != 2 or actions.shape[0] < 4:
+        return None
+    nyquist = float(fps) / 2.0
+    if nyquist <= high_hz:
+        # The high band sits at or above Nyquist: any real chatter there
+        # aliases into lower bands, so high_fraction=0 would be a false
+        # "no chatter" — report unmeasurable instead.
+        return None
+
+    # Demean per-dim to drop the DC bin (mostly position offset, not signal).
+    a = actions - actions.mean(axis=0, keepdims=True)
+    spectrum = np.abs(np.fft.rfft(a, axis=0)) ** 2
+    freq = np.fft.rfftfreq(actions.shape[0], d=1.0 / float(fps))
+
+    low_mask = freq <= low_hz
+    high_mask = freq > high_hz
+    mid_mask = ~(low_mask | high_mask)
+
+    low_p = spectrum[low_mask].sum(axis=0)
+    mid_p = spectrum[mid_mask].sum(axis=0)
+    high_p = spectrum[high_mask].sum(axis=0)
+    total = low_p + mid_p + high_p
+    safe_total = np.where(total > 1e-12, total, 1.0)
+
+    low_frac = low_p / safe_total
+    mid_frac = mid_p / safe_total
+    high_frac = high_p / safe_total
+
+    return {
+        "low_fraction": float(low_frac.mean()),
+        "mid_fraction": float(mid_frac.mean()),
+        "high_fraction": float(high_frac.mean()),
+        "low_fraction_per_dim": low_frac.tolist(),
+        "mid_fraction_per_dim": mid_frac.tolist(),
+        "high_fraction_per_dim": high_frac.tolist(),
+        "low_hz": float(low_hz),
+        "high_hz": float(high_hz),
+    }
+
+
+# ── Metric 9c: State-conditioned action variance ────────────────
+
+
+def state_conditioned_action_variance(
+    states: NDArray,
+    actions: NDArray,
+    *,
+    k: int = 5,
+) -> tuple[NDArray, float] | tuple[None, None]:
+    """Demonstrator self-consistency — proprio cousin of STAC.
+
+    For each frame, find the k nearest-state frames within the same episode
+    (excluding the frame itself) and compute the variance of their actions.
+    Episode statistic is the mean over per-frame variances.
+
+    High value = the demonstrator picked different actions at very similar
+    states. Could be intentional multimodality, a teleop reversal, or sloppy
+    teaching. Low value = consistent state→action mapping.
+
+    Args:
+        states: Shape (T, D_s) state array.
+        actions: Shape (T, D_a) action array.
+        k: Neighbors to query (excluding self). Default 5.
+
+    Returns:
+        (per_frame_variance, mean_variance) — both None if episode is too
+        short or arrays don't align.
+    """
+    if (
+        states.ndim != 2
+        or actions.ndim != 2
+        or states.shape[0] != actions.shape[0]
+        or states.shape[0] < k + 2
+    ):
+        return None, None
+
+    # Pure-numpy pairwise k-NN. Memory is O(T²); fine for typical episodes
+    # (T < 2k frames → <32 MB). For much longer episodes, swap in a KDTree.
+    s = states.astype(np.float64, copy=False)
+    sq_norm = (s * s).sum(axis=1)
+    dist_sq = sq_norm[:, None] + sq_norm[None, :] - 2.0 * (s @ s.T)
+    np.fill_diagonal(dist_sq, np.inf)  # never pick self as own neighbor
+    nn_idx = np.argpartition(dist_sq, kth=k, axis=1)[:, :k]
+
+    neighbor_actions = actions[nn_idx]  # (T, k, D_a)
+    # Variance across the k neighbors per action dim, then mean across dims —
+    # gives a single per-frame disagreement scalar.
+    var_per_dim = neighbor_actions.var(axis=1)
+    per_frame = var_per_dim.mean(axis=1)
+    return per_frame, float(per_frame.mean())
 
 
 # ── Metric 10: Composite Quality Score ──────────────────────────
