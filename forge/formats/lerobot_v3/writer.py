@@ -57,6 +57,10 @@ class LeRobotV3WriterConfig:
         chunks_size: Number of episodes per chunk (default: 1000).
         repo_id: Optional HuggingFace repository ID.
         camera_name_mapping: Optional mapping from source to target camera names.
+        tokenized_action_feature: If set, frames carrying this key in
+            ``frame.extras`` are written as an integer column of that name
+            (dtype int64) and declared in info.json. Token ids are excluded
+            from stats. Default None = current behavior (no token column).
     """
 
     fps: float = 30.0
@@ -70,6 +74,7 @@ class LeRobotV3WriterConfig:
     video_files_size_in_mb: int = 200
     repo_id: str | None = None
     camera_name_mapping: dict[str, str] = field(default_factory=dict)
+    tokenized_action_feature: str | None = None
 
 
 @FormatRegistry.register_writer("lerobot-v3")
@@ -376,6 +381,22 @@ class LeRobotV3Writer:
                     self._features["action"] = {
                         "dtype": "float32",
                         "shape": list(frame.action.shape),
+                        "names": None,
+                        "fps": float(fps),
+                    }
+
+            # Add action tokens (opt-in): an integer column sourced from
+            # frame.extras, excluded from stats (token ids aren't continuous).
+            tok_key = self.config.tokenized_action_feature
+            if tok_key and tok_key in frame.extras:
+                import numpy as np
+
+                tokens = np.asarray(frame.extras[tok_key]).astype(np.int64)
+                row[tok_key] = tokens.tolist()
+                if tok_key not in self._features:
+                    self._features[tok_key] = {
+                        "dtype": "int64",
+                        "shape": list(tokens.shape),
                         "names": None,
                         "fps": float(fps),
                     }

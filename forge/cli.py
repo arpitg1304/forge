@@ -22,6 +22,11 @@ registry_app = typer.Typer(
     help="Dataset registry - browse and search known robotics datasets.",
 )
 app.add_typer(registry_app, name="registry")
+tokenize_app = typer.Typer(
+    name="tokenize",
+    help="Action tokenizers - discretize action streams into tokens.",
+)
+app.add_typer(tokenize_app, name="tokenize")
 console = Console()
 
 
@@ -2741,6 +2746,206 @@ def segment_cmd(
         except MissingDependencyError as e:
             console.print(f"[red]Error:[/red] {e}")
             raise typer.Exit(1)
+
+
+@tokenize_app.command("list")
+def tokenize_list_cmd() -> None:
+    """List registered action tokenizer strategies."""
+    from forge.tokenize import TokenizerRegistry
+
+    table = Table(title="Action Tokenizer Strategies")
+    table.add_column("Strategy", style="cyan", no_wrap=True)
+    table.add_column("Granularity", style="green")
+    table.add_column("Default vocab", justify="right")
+
+    for name in TokenizerRegistry.list_strategies():
+        tok = TokenizerRegistry.create(name)
+        table.add_row(name, tok.granularity, str(tok.vocab_size))
+
+    console.print(table)
+
+
+@tokenize_app.command("compare")
+def tokenize_compare_cmd(
+    path: str = typer.Argument(..., help="Path to dataset (local or hf://org/repo)"),
+    strategies: str | None = typer.Option(
+        None, "--strategies", help="Comma-separated subset of strategies (default: all)"
+    ),
+    sample: int = typer.Option(
+        0, "--sample", "-s", help="Score on N evenly-spaced frames (0 = all)"
+    ),
+    num_bins: int = typer.Option(256, "--num-bins", "-b", help="Vocabulary size"),
+    export: Path | None = typer.Option(
+        None, "--export", "-e", help="Export comparison report to JSON"
+    ),
+) -> None:
+    """Benchmark every tokenizer strategy on your dataset.
+
+    Reports reconstruction error (MSE/MAE/max-abs), tokens-per-step and vocab
+    utilization so you can pick the discretization that fits your actions.
+
+    Examples:
+        forge tokenize compare ./dataset
+        forge tokenize compare pusht --sample 20 --export report.json
+    """
+    from forge.core.exceptions import ForgeError
+    from forge.tokenize import TokenizerComparator
+
+    names = [s.strip() for s in strategies.split(",")] if strategies else None
+    resolved = _resolve_dataset_path(path)
+    if not resolved.exists():
+        console.print(f"[red]Error:[/red] Dataset not found: {resolved}")
+        raise typer.Exit(1)
+
+    console.print(f"[cyan]Tokenizer comparison:[/cyan] {path}")
+    try:
+        with console.status("[bold green]Fitting and scoring strategies..."):
+            report = TokenizerComparator().compare_dataset(
+                resolved, strategies=names, sample=sample
+            )
+    except ForgeError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1)
+
+    console.print(
+        f"[dim]{report.num_frames} frames, action_dim={report.action_dim}, "
+        f"scored on {report.sample_size}[/dim]\n"
+    )
+
+    best = report.best_by("mae")
+    table = Table(title="Tokenizer Comparison")
+    table.add_column("Strategy", style="cyan", no_wrap=True)
+    table.add_column("Vocab", justify="right")
+    table.add_column("MAE", justify="right")
+    table.add_column("MSE", justify="right")
+    table.add_column("Max-abs", justify="right")
+    table.add_column("Tokens/step", justify="right")
+    table.add_column("Vocab util", justify="right")
+
+    for name, st in sorted(report.stats_by_strategy.items(), key=lambda kv: kv[1].mae):
+        label = f"{name} [green]✓[/green]" if name == best else name
+        table.add_row(
+            label,
+            str(st.vocab_size),
+            f"{st.mae:.4f}",
+            f"{st.mse:.4f}",
+            f"{st.max_abs:.4f}",
+            f"{st.tokens_per_step:.1f}",
+            f"{st.vocab_utilization:.0%}",
+        )
+    console.print(table)
+    if best:
+        console.print(f"\n[green]Lowest MAE:[/green] {best}")
+
+    if export:
+        report.to_json(export)
+        console.print(f"[green]Report saved to:[/green] {export}")
+
+
+@tokenize_app.command("fit")
+def tokenize_fit_cmd(
+    path: str = typer.Argument(..., help="Path to dataset (local or hf://org/repo)"),
+    out: Path = typer.Option(..., "--out", "-o", help="Output path for fitted tokenizer JSON"),
+    strategy: str = typer.Option("openvla-bins", "--strategy", help="Tokenizer strategy"),
+    num_bins: int = typer.Option(256, "--num-bins", "-b", help="Vocabulary size"),
+) -> None:
+    """Fit a tokenizer on a dataset's action corpus and save it.
+
+    Examples:
+        forge tokenize fit ./dataset --strategy openvla-bins --out tok.json
+    """
+    from forge.core.exceptions import ForgeError
+    from forge.formats.registry import FormatRegistry
+    from forge.tokenize import TokenizerRegistry
+    from forge.tokenize.writer import _build_corpus
+
+    resolved = _resolve_dataset_path(path)
+    if not resolved.exists():
+        console.print(f"[red]Error:[/red] Dataset not found: {resolved}")
+        raise typer.Exit(1)
+
+    try:
+        fmt = FormatRegistry.detect_format(resolved)
+        reader = FormatRegistry.get_reader(fmt)
+        with console.status("[bold green]Fitting tokenizer..."):
+            corpus = _build_corpus(reader.read_episodes(resolved))
+            tok = TokenizerRegistry.create(strategy, num_bins=num_bins).fit(corpus)
+            tok.save(out)
+    except ForgeError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1)
+
+    console.print(
+        f"[green]Fitted[/green] {strategy} (vocab={tok.vocab_size}) on "
+        f"{corpus.shape[0]} frames → [cyan]{out}[/cyan]"
+    )
+
+
+@tokenize_app.command("write")
+def tokenize_write_cmd(
+    source: str = typer.Argument(..., help="Source dataset (local or hf://org/repo)"),
+    output: Path = typer.Argument(..., help="Output dataset directory"),
+    strategy: str = typer.Option("openvla-bins", "--strategy", help="Tokenizer strategy"),
+    num_bins: int = typer.Option(256, "--num-bins", "-b", help="Vocabulary size when fitting"),
+    tokenizer: Path | None = typer.Option(
+        None, "--tokenizer", help="Use a pre-fitted tokenizer JSON instead of fitting"
+    ),
+    keep_actions: bool = typer.Option(
+        False, "--keep-actions", help="Retain the float action column alongside tokens"
+    ),
+    fps: float = typer.Option(30.0, "--fps", "-f", help="Output dataset FPS"),
+) -> None:
+    """Write a LeRobot v3 dataset with an action_tokens column.
+
+    The fitted tokenizer is saved to <output>/meta/action_tokenizer.json for
+    inference-time detokenization.
+
+    Examples:
+        forge tokenize write ./dataset ./out --strategy openvla-bins
+        forge tokenize write pusht ./out --tokenizer tok.json --keep-actions
+    """
+    from rich.progress import BarColumn, MofNCompleteColumn, Progress, TextColumn
+
+    from forge.core.exceptions import ForgeError
+    from forge.tokenize.writer import tokenize_and_write
+
+    resolved = _resolve_dataset_path(source)
+    if not resolved.exists():
+        console.print(f"[red]Error:[/red] Dataset not found: {resolved}")
+        raise typer.Exit(1)
+
+    console.print(f"[cyan]Tokenizing:[/cyan] {source} → {output}")
+    try:
+        with Progress(
+            TextColumn("[bold green]{task.description}"),
+            BarColumn(),
+            MofNCompleteColumn(),
+            console=console,
+        ) as progress:
+            task = progress.add_task("Writing episodes...", total=None)
+
+            def _cb(idx: int, ep_id: str) -> None:
+                progress.advance(task)
+
+            result = tokenize_and_write(
+                source=resolved,
+                output=output,
+                strategy=strategy,
+                tokenizer_path=tokenizer,
+                num_bins=num_bins,
+                keep_actions=keep_actions,
+                fps=fps,
+                progress_callback=_cb,
+            )
+    except ForgeError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1)
+
+    console.print(
+        f"[green]Wrote[/green] {result.num_episodes} episodes "
+        f"({result.num_frames} frames) using {result.strategy}"
+    )
+    console.print(f"[green]Tokenizer saved to:[/green] {result.tokenizer_path}")
 
 
 @app.command("version")

@@ -68,6 +68,23 @@ Features:
 - [x] Support OXE-compatible schema
 - [x] Round-trip conversion verified
 
+### ✅ Action Tokenization
+**Status:** Done
+
+```bash
+forge tokenize compare ./dataset --export report.json
+forge tokenize write ./dataset ./tokenized --strategy openvla-bins
+```
+
+Features:
+- [x] `ActionTokenizer` protocol + `TokenizerRegistry` (one-decorator extension)
+- [x] Built-in per-step strategies: `uniform-bins`, `openvla-bins`, `quantile-bins`, `mu-law` (numpy-only)
+- [x] `TokenizerComparator` — reconstruction error / tokens-per-step / vocab utilization
+- [x] Tokenized LeRobot v3 writer (`action_tokens` column) + saved tokenizer for inference decode
+- [ ] FAST (DCT+BPE) and k-means (BeT) strategies — dependency-gated stretch
+- [ ] Chunk-granularity dataset writer (per-step only in v1)
+- [ ] Parallel write path (sequential in v1)
+
 ---
 
 ## High Priority (v0.3)

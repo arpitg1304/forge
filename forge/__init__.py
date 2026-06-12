@@ -60,6 +60,14 @@ from forge.filter.engine import FilterConfig, FilterEngine, FilterResult
 from forge.formats.registry import FormatRegistry
 from forge.inspect.inspector import InspectionOptions, Inspector
 from forge.segment import SegmentAnalyzer, SegmentationReport, SegmentConfig
+from forge.tokenize import (
+    ActionTokenizer,
+    ComparisonReport,
+    TokenizerComparator,
+    TokenizerRegistry,
+    TokenizerStats,
+    load_tokenizer,
+)
 
 __version__ = "0.1.0"
 
@@ -101,6 +109,13 @@ __all__ = [
     "SegmentAnalyzer",
     "SegmentConfig",
     "SegmentationReport",
+    # Tokenize
+    "ActionTokenizer",
+    "TokenizerRegistry",
+    "TokenizerComparator",
+    "ComparisonReport",
+    "TokenizerStats",
+    "load_tokenizer",
     # Module-level functions
     "inspect",
     "convert",

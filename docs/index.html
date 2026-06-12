@@ -684,7 +684,7 @@
 <section class="hero">
   <div class="hero-logo">FORGE</div>
   <p class="hero-tagline">
-    The normalization layer for robotics data. Convert, inspect, visualize, score, and discover datasets across every major format.
+    The normalization layer for robotics data. Convert, inspect, score, tokenize, visualize, and discover datasets across every major format.
   </p>
   <div class="hero-diagram">
     <span class="fmt">RLDS</span> &nbsp;<span class="arrow">===</span><span class="gear">\</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="gear">/</span><span class="arrow">===</span>&gt; <span class="fmt">LeRobot</span><br>
@@ -721,7 +721,7 @@
   <div class="section-header">
     <div class="section-label">Features</div>
     <h2 class="section-title">Everything you need for robotics data</h2>
-    <p class="section-subtitle">One toolkit to convert, inspect, score, filter, segment, and browse robotics datasets.</p>
+    <p class="section-subtitle">One toolkit to convert, inspect, score, filter, segment, tokenize, and browse robotics datasets.</p>
   </div>
 
   <div class="features-grid">
@@ -794,6 +794,18 @@
       <div class="feature-desc">Browser-based viewer with multi-camera support, action/state charts, timeline scrubber, and segment overlay. Zero extra dependencies.</div>
       <div class="feature-code">
         <span class="prompt">$ </span><span class="cmd">forge visualize</span> <span class="arg">pusht</span> <span class="flag">--segment</span>
+      </div>
+    </div>
+
+    <!-- Tokenize -->
+    <div class="feature-card c-green">
+      <div class="feature-icon green">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>
+      </div>
+      <div class="feature-title">Action Tokenization</div>
+      <div class="feature-desc">Turn continuous actions into the discrete tokens VLA models train on. Four built-in strategies (RT-1, OpenVLA, quantile, mu-law) and a comparator that benchmarks them on <em>your</em> data &mdash; measure, don't guess.</div>
+      <div class="feature-code">
+        <span class="prompt">$ </span><span class="cmd">forge tokenize compare</span> <span class="arg">./my_dataset</span> <span class="flag">--export report.json</span>
       </div>
     </div>
 
@@ -949,6 +961,33 @@
 <span class="t-border">│</span>  Written to:        <span class="t-cyan">./filtered/</span>              <span class="t-border">│</span>
 <span class="t-border">│</span>                                             <span class="t-border">│</span>
 <span class="t-border">╰─────────────────────────────────────────────╯</span></div>
+    </div>
+
+    <!-- Tokenize -->
+    <div class="terminal demo-full">
+      <div class="terminal-bar">
+        <div class="terminal-dot red"></div>
+        <div class="terminal-dot yellow"></div>
+        <div class="terminal-dot green"></div>
+        <div class="terminal-title">forge tokenize</div>
+      </div>
+      <div class="terminal-body"><span class="t-prompt">$ </span><span class="t-cmd">forge tokenize compare pusht --sample 2000</span>
+
+<span class="t-dim">Tokenizer comparison: pusht &mdash; 25,650 frames, action_dim=2, scored on 2000</span>
+
+<span class="t-header">                       Tokenizer Comparison</span>
+<span class="t-border">┏━━━━━━━━━━━━━━━━┳━━━━━━━┳━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━━━┓</span>
+<span class="t-border">┃</span> <span class="t-bold">Strategy</span>       <span class="t-border">┃</span> <span class="t-bold">Vocab</span> <span class="t-border">┃</span>    <span class="t-bold">MAE</span> <span class="t-border">┃</span>     <span class="t-bold">MSE</span> <span class="t-border">┃</span> <span class="t-bold">Max-abs</span> <span class="t-border">┃</span> <span class="t-bold">Vocab util</span> <span class="t-border">┃</span>
+<span class="t-border">┡━━━━━━━━━━━━━━━━╇━━━━━━━╇━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━━━┩</span>
+<span class="t-border">│</span> <span class="t-green">uniform-bins ✓</span> <span class="t-border">│</span>   256 <span class="t-border">│</span> <span class="t-green">0.4829</span> <span class="t-border">│</span>  0.3098 <span class="t-border">│</span>  0.9746 <span class="t-border">│</span>        96% <span class="t-border">│</span>
+<span class="t-border">│</span> <span class="t-cyan">quantile-bins</span>  <span class="t-border">│</span>   256 <span class="t-border">│</span> 0.6442 <span class="t-border">│</span>  1.6471 <span class="t-border">│</span> 23.5000 <span class="t-border">│</span>       100% <span class="t-border">│</span>
+<span class="t-border">│</span> <span class="t-cyan">openvla-bins</span>   <span class="t-border">│</span>   256 <span class="t-border">│</span> 0.6828 <span class="t-border">│</span>  7.6404 <span class="t-border">│</span> 61.7969 <span class="t-border">│</span>       100% <span class="t-border">│</span>
+<span class="t-border">│</span> <span class="t-cyan">mu-law</span>         <span class="t-border">│</span>   256 <span class="t-border">│</span> 2.8620 <span class="t-border">│</span> 12.5675 <span class="t-border">│</span> 10.9926 <span class="t-border">│</span>        27% <span class="t-border">│</span>
+<span class="t-border">└────────────────┴───────┴────────┴─────────┴─────────┴────────────┘</span>
+
+<span class="t-bold">Lowest MAE:</span> <span class="t-green">uniform-bins</span>
+<span class="t-dim"># pusht actions are raw pixel coords &mdash; RT-1 min/max bins beat OpenVLA's
+# percentile clipping on this dataset. The right tokenizer depends on your data.</span></div>
     </div>
 
     <!-- Segmentation Timeline Image -->
@@ -1325,9 +1364,10 @@
     <div class="step-card">
       <div class="step-num">3</div>
       <div class="step-title">Convert and go</div>
-      <div class="step-desc">Convert to any format you need for training.</div>
+      <div class="step-desc">Convert to any format you need for training &mdash; tokenized actions included.</div>
       <div class="feature-code">
-        <span class="prompt">$ </span><span class="cmd">forge convert</span> <span class="arg">droid</span> <span class="arg">./output</span> <span class="flag">--format lerobot-v3</span>
+        <span class="prompt">$ </span><span class="cmd">forge convert</span> <span class="arg">droid</span> <span class="arg">./output</span> <span class="flag">--format lerobot-v3</span><br>
+        <span class="prompt">$ </span><span class="cmd">forge tokenize write</span> <span class="arg">./output</span> <span class="arg">./tokenized</span>
       </div>
     </div>
   </div>
