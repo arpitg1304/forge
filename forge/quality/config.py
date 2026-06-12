@@ -42,6 +42,12 @@ class QualityConfig:
     entropy_high_flag: float = 0.95        # normalized entropy above this = random
     ldlj_flag: float = -25.0              # LDLJ below this = jerky
 
+    # ── New metric parameters ──
+    psd_low_hz: float = 2.0                # upper edge of low band
+    psd_high_hz: float = 8.0               # lower edge of high band ("chatter")
+    psd_high_flag: float = 0.20            # >20% of action energy above high_hz = flagged
+    state_action_k: int = 5                # neighbors for state-conditioned variance
+
     # ── Smoothness scoring (sigmoid) ──
     ldlj_sigmoid_center: float = -18.0
     ldlj_sigmoid_scale: float = 4.0
