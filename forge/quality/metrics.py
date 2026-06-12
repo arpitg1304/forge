@@ -409,8 +409,10 @@ def psd_band_energy(
     if actions.ndim != 2 or actions.shape[0] < 4:
         return None
     nyquist = float(fps) / 2.0
-    if nyquist <= low_hz:
-        # Can't resolve the bands the caller asked about.
+    if nyquist <= high_hz:
+        # The high band sits at or above Nyquist: any real chatter there
+        # aliases into lower bands, so high_fraction=0 would be a false
+        # "no chatter" — report unmeasurable instead.
         return None
 
     # Demean per-dim to drop the DC bin (mostly position offset, not signal).

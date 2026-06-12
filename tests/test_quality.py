@@ -385,6 +385,13 @@ class TestPsdBandEnergy:
         # fps=2 → nyquist=1, can't resolve a 2 Hz low-band edge.
         assert psd_band_energy(np.zeros((200, 4)), fps=2.0) is None
 
+    def test_high_band_above_nyquist_returns_none(self):
+        # fps=10 → nyquist=5 Hz < 8 Hz high-band edge. Chatter aliases into
+        # lower bands, so a high_fraction of 0 would be a false negative.
+        t = np.arange(200) / 10.0
+        actions = np.column_stack([np.sin(2 * np.pi * t)] * 4)
+        assert psd_band_energy(actions, fps=10.0) is None
+
 
 class TestStateConditionedActionVariance:
     def test_identical_states_zero_variance(self):
