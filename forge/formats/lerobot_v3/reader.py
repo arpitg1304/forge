@@ -702,8 +702,17 @@ class LeRobotV3Reader:
                         tasks,
                     )
 
+                    file_first_index = (
+                        int(df["index"].min()) if "index" in df.columns else 0
+                    )
                     yield self._load_episode_from_dataframe(
-                        path, pq_file, df, episode_idx, episode_id, language
+                        path,
+                        pq_file,
+                        df,
+                        episode_idx,
+                        episode_id,
+                        language,
+                        file_first_index,
                     )
             else:
                 # Single episode per file (old format)
@@ -839,6 +848,7 @@ class LeRobotV3Reader:
         episode_idx: int,
         episode_id: str,
         language: str | None,
+        file_first_index: int = 0,
     ) -> Episode:
         """Load a single episode from an already-loaded dataframe.
 
@@ -849,7 +859,13 @@ class LeRobotV3Reader:
         ep_df = df[df["episode_index"] == episode_idx].reset_index(drop=True)
 
         return self._build_episode(
-            dataset_path, parquet_path, ep_df, episode_idx, episode_id, language
+            dataset_path,
+            parquet_path,
+            ep_df,
+            episode_idx,
+            episode_id,
+            language,
+            file_first_index,
         )
 
     def _load_episode(
@@ -871,9 +887,16 @@ class LeRobotV3Reader:
             ep_df = df[df["episode_index"] == episode_idx].reset_index(drop=True)
         else:
             ep_df = df
+        file_first_index = int(df["index"].min()) if "index" in df.columns else 0
 
         return self._build_episode(
-            dataset_path, parquet_path, ep_df, episode_idx, episode_id, language
+            dataset_path,
+            parquet_path,
+            ep_df,
+            episode_idx,
+            episode_id,
+            language,
+            file_first_index,
         )
 
     def _build_episode(
@@ -884,6 +907,7 @@ class LeRobotV3Reader:
         episode_idx: int,
         episode_id: str,
         language: str | None,
+        file_first_index: int = 0,
     ) -> Episode:
         """Build an Episode object from a filtered dataframe."""
 
@@ -1040,8 +1064,12 @@ class LeRobotV3Reader:
 
                 # Get the frame index within the video
                 if is_multi_episode_video and "index" in ep_df.columns:
-                    # Multi-episode video: use global index for seeking
-                    global_frame_idx = int(row["index"])
+                    # Multi-episode video: seek relative to the parquet file's
+                    # first frame. The video chunk dirs mirror the data chunk
+                    # dirs, so each video file starts at its parquet file's
+                    # first row; an absolute dataset index over-seeks every
+                    # episode outside the first chunk and decodes black frames.
+                    global_frame_idx = int(row["index"]) - file_first_index
                 elif "frame_index" in ep_df.columns:
                     # Single-episode video: use relative frame_index
                     global_frame_idx = int(row["frame_index"])

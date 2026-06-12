@@ -88,3 +88,40 @@ class TestLeRobotV3RoundTrip:
         assert read_back[1].language_instruction == "place the cube in the bin"
         assert len(list(read_back[0].frames())) == 3
         assert len(list(read_back[1].frames())) == 4
+
+    @pytest.mark.skipif(
+        not _check_dependencies_available(),
+        reason="PyAV or PyArrow not installed",
+    )
+    def test_video_frames_survive_round_trip(self, tmp_path: Path):
+        """read_episodes decodes each episode's pixels from its own chunk.
+
+        Video chunk files restart at frame 0, but frames carry the global
+        dataset index — seeking by the absolute index over-seeks every
+        episode outside the first chunk and silently returns black frames.
+        """
+        import numpy as np
+
+        output_dir = tmp_path / "dataset"
+        episodes = [
+            _make_episode(0, 5, "first"),
+            _make_episode(1, 5, "second"),
+        ]
+        writer = LeRobotV3Writer(
+            LeRobotV3WriterConfig(fps=30.0, robot_type="test_robot")
+        )
+        writer.write_dataset(iter(episodes), output_dir)
+
+        read_back = list(LeRobotV3Reader().read_episodes(output_dir))
+
+        assert len(read_back) == 2
+        for episode_index, episode in enumerate(read_back):
+            # Frame 3, not 0: _make_episode's gradient paints frame N with
+            # value N * 10, so frame 0 is legitimately black.
+            frame = list(episode.frames())[3]
+            image = frame.images["camera0"]
+            mean = float(np.asarray(image.load()).mean())
+            assert mean > 1.0, (
+                f"episode {episode_index} decoded black frames (mean={mean})"
+            )
+
