@@ -117,7 +117,10 @@ class TestTrossenWithGeneratedConfig:
         ep = eps[0]
         frames = ep.load_frames()
         assert len(frames) > 0
-        assert ep.language_instruction == "Pick and transfer the cube."
+        assert (
+            ep.language_instruction
+            == "Pick and transfer the cube back and forth between grippers."
+        )
 
 
 # ---------------------------------------------------------------------------
