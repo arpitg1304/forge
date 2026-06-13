@@ -127,17 +127,40 @@ def test_frozen_frames_flagged():
 
 
 def test_underexposed_flagged():
-    ep = make_episode([{"cam": _solid_frame(5)} for _ in range(20)])
+    ep = make_episode([{"cam": _solid_frame(2)} for _ in range(20)])
     vq = VideoQualityAnalyzer(VideoQualityConfig()).analyze_episode(ep)
     assert vq is not None
     assert "under_exposed" in vq.flags
 
 
 def test_overexposed_flagged():
-    ep = make_episode([{"cam": _solid_frame(250)} for _ in range(20)])
+    # Genuinely blown highlights (pegged at the ceiling), not merely bright.
+    ep = make_episode([{"cam": _solid_frame(255)} for _ in range(20)])
     vq = VideoQualityAnalyzer(VideoQualityConfig()).analyze_episode(ep)
     assert vq is not None
     assert "over_exposed" in vq.flags
+
+
+def test_bright_unclipped_scene_not_overexposed():
+    # A uniformly bright but unsaturated background (e.g. a sim canvas) is fine.
+    ep = make_episode([{"cam": _solid_frame(245)} for _ in range(20)])
+    vq = VideoQualityAnalyzer(VideoQualityConfig()).analyze_episode(ep)
+    assert vq is not None
+    assert "over_exposed" not in vq.flags
+
+
+def test_slow_motion_not_frozen():
+    # A moving foreground on a static background (PushT-scale: whole-frame MAE
+    # ~0.5) is low-motion but genuinely changing — not a frozen/stalled stream.
+    base = _sharp_frame(seed=7).astype(np.int16)
+    frames = []
+    for i in range(30):
+        f = base.copy()
+        f[16:48, 16:48, :] = (40 + 6 * i) % 256  # ~MAE 0.6 between frames
+        frames.append({"cam": f.astype(np.uint8)})
+    vq = VideoQualityAnalyzer(VideoQualityConfig()).analyze_episode(make_episode(frames))
+    assert vq is not None
+    assert "frozen_frames" not in vq.flags
 
 
 def test_no_images_returns_none():
