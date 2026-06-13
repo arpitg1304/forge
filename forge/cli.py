@@ -1833,11 +1833,18 @@ def quality_cmd(
     export_flagged: Path | None = typer.Option(None, "--export-flagged", help="Export flagged episode IDs to JSON"),
     quick: bool = typer.Option(False, "--quick", "-q", help="Quick mode (sample 50 episodes)"),
     action_bounds: str | None = typer.Option(None, "--action-bounds", help="Known action bounds as 'min,max' (e.g., '-1,1')"),
+    video: bool = typer.Option(False, "--video", help="Also analyze camera streams (Tier 0 pixel metrics)"),
+    video_level: str = typer.Option("pixel", "--video-level", help="Video metric tier: 'pixel' (Tier 0). motion/semantic coming soon."),
+    video_downscale: int = typer.Option(128, "--video-downscale", help="Longest side (px) of the analysis frame"),
+    video_stride: int = typer.Option(1, "--video-stride", help="Analyze every Nth image-bearing frame"),
+    video_max_frames: int = typer.Option(0, "--video-max-frames", help="Cap analyzed frames per camera (0 = all)"),
+    video_cameras: str | None = typer.Option(None, "--video-cameras", help="Comma-separated camera names (default: all)"),
 ) -> None:
     """Compute quality metrics on dataset episodes.
 
     Analyzes proprioception data (actions, states, timestamps) to score episode
-    quality. No video processing — pure numpy number crunching.
+    quality. Pure numpy number crunching by default — pass --video to also score
+    camera streams (Tier 0 pixel metrics: blur, exposure, frozen frames, colour).
 
     Metrics: smoothness (LDLJ), dead actions, gripper chatter, static detection,
     timestamp regularity, action saturation, action diversity.
@@ -1847,6 +1854,7 @@ def quality_cmd(
         forge quality ./dataset --gripper-dim 6 --fps 30
         forge quality ./dataset --export quality_report.json
         forge quality ./dataset --quick
+        forge quality ./dataset --video --video-stride 4
         forge quality hf://lerobot/aloha_sim_cube --sample 100
     """
     from rich.panel import Panel
@@ -1872,6 +1880,25 @@ def quality_cmd(
         action_bounds=bounds,
     )
 
+    # Video (Tier 0) config — only built when --video is passed.
+    video_config = None
+    if video:
+        if video_level != "pixel":
+            console.print(
+                f"[red]Error:[/red] --video-level '{video_level}' not available yet. "
+                "Tier 0 ('pixel') is the only supported level; motion/semantic are coming soon."
+            )
+            raise typer.Exit(1)
+        from forge.quality.video import VideoQualityConfig
+
+        cam_list = [c.strip() for c in video_cameras.split(",")] if video_cameras else None
+        video_config = VideoQualityConfig(
+            downscale=video_downscale,
+            sample_stride=video_stride,
+            max_frames=video_max_frames,
+            cameras=cam_list,
+        )
+
     if quick and sample == 0:
         sample = 50
 
@@ -1895,7 +1922,7 @@ def quality_cmd(
     console.print()
 
     # Analyze with progress bar
-    analyzer = QualityAnalyzer(config=config)
+    analyzer = QualityAnalyzer(config=config, video_config=video_config)
     from collections import defaultdict
 
     from forge.quality.models import QualityReport
@@ -2043,6 +2070,42 @@ def quality_cmd(
                 f"  State-action variance    mean={np.mean(sa_vals):.3f}  "
                 f"[dim](range {np.min(sa_vals):.2f}\u2013{np.max(sa_vals):.2f})[/dim]"
             )
+
+    # Video (Tier 0) summary
+    vid_eps = [eq for eq in report.per_episode if eq.video is not None]
+    if vid_eps:
+        cams: set[str] = set()
+        for eq in vid_eps:
+            cams.update(eq.video.per_camera.keys())
+
+        def _vid_mean(attr: str) -> float | None:
+            vals = [
+                getattr(eq.video, attr)
+                for eq in vid_eps
+                if getattr(eq.video, attr) is not None
+            ]
+            return float(np.mean(vals)) if vals else None
+
+        lines.append("")
+        lines.append(
+            f"[bold]Video[/bold] [dim](Tier 0 — pixel, {len(vid_eps)} episodes, "
+            f"{len(cams)} camera{'s' if len(cams) != 1 else ''})[/dim]"
+        )
+
+        def _vid_line(label: str, value: float | None, flag_key: str, fmt: str) -> None:
+            if value is None:
+                return
+            n_flag = len(report.flagged_episodes.get(flag_key, []))
+            flag_str = f"  [yellow]{n_flag} flagged[/yellow]" if n_flag else "  OK"
+            lines.append(f"  {label:<26} {format(value, fmt)}{flag_str}")
+
+        _vid_line("Sharpness (min, mean)", _vid_mean("min_sharpness"), "blurry", ".0f")
+        _vid_line("Overexposed fraction", _vid_mean("overexposed_fraction"), "over_exposed", ".2f")
+        _vid_line("Underexposed fraction", _vid_mean("underexposed_fraction"), "under_exposed", ".2f")
+        _vid_line("Frozen-frame fraction", _vid_mean("frozen_fraction"), "frozen_frames", ".2f")
+        color = _vid_mean("mean_colorfulness")
+        if color is not None:
+            lines.append(f"  {'Colorfulness':<26} {color:.1f}  [dim](scene diversity)[/dim]")
 
     # Top issues
     if report.flags:

@@ -210,7 +210,7 @@ Add both to the `all` extra.
 
 | # | PR | Scope | Deps |
 |---|---|---|---|
-| 1 | **tier-0 module** | `decode.py` single-pass iterator + `pixel.py` (sharpness, exposure, frozen-frame, colorfulness) → `VideoQuality`, wired into `forge quality --video --video-level pixel`, fields in report | opencv, av |
+| 1 ✅ | **tier-0 module** | `forge/quality/video/` (`pixel.py` + streaming `analyzer.py`): sharpness, exposure, frozen-frame, colourfulness → `VideoQuality`, wired into `forge quality --video --video-level pixel`, shares the proprio decode pass, fields flattened into the report. **Numpy-only — no new deps** (operates on already-decoded `LazyImage` frames; decode stays the reader's concern). | none |
 | 2 | **filter integration** | `--max-blur`/`--min-motion` + new flags through `forge filter`; the cheapest way to make tier-0 *useful* | — |
 | 3 | **`forge dedup` (phash)** | new verb, perceptual-hash clustering, same-format writer | Pillow |
 | 4 | **tier-1 motion** | `motion.py`: optical flow magnitude, pixel-space smoothness, cam/scene split, cut detection; `--video-level motion` | opencv |
