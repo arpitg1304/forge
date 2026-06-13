@@ -2347,6 +2347,154 @@ def filter_cmd(
         )
 
 
+@app.command("dedup")
+def dedup_cmd(
+    source: str = typer.Argument(..., help="Path to dataset (local or hf://org/repo)"),
+    output: Path | None = typer.Argument(None, help="Output path for deduplicated dataset (omit for dry-run)"),
+    method: str = typer.Option("phash", "--method", "-m", help="Perceptual hash: phash (robust), dhash (fast), ahash (cheapest). 'clip' coming in Tier 2."),
+    threshold: float = typer.Option(0.10, "--threshold", "-t", help="Max normalized Hamming distance to call two episodes duplicates (0 = exact)"),
+    keyframes: int = typer.Option(16, "--keyframes", help="Frames sampled per episode per camera for the signature"),
+    hash_size: int = typer.Option(8, "--hash-size", help="Hash side length; hash is hash_size^2 bits"),
+    cameras: str | None = typer.Option(None, "--cameras", help="Comma-separated camera names (default: all)"),
+) -> None:
+    """Find and remove near-duplicate episodes by perceptual hashing.
+
+    Hashes K uniformly-spaced keyframes per camera, clusters episodes whose
+    worst-case per-camera Hamming distance is within --threshold, and keeps one
+    representative per cluster. Dry-run by default; pass an output path to write
+    the deduplicated dataset in the same format.
+
+    Tier 0: numpy only, CPU, no model.
+
+    Examples:
+        forge dedup ./dataset                                  # Dry-run
+        forge dedup ./dataset ./deduped --threshold 0.05
+        forge dedup ./dataset ./deduped --method dhash --keyframes 8
+    """
+    from rich.panel import Panel
+    from rich.progress import BarColumn, MofNCompleteColumn, Progress, TextColumn
+    from rich.table import Table
+
+    from forge.core.exceptions import ForgeError
+    from forge.dedup import DedupConfig, DedupEngine
+
+    if method == "clip":
+        console.print(
+            "[red]Error:[/red] --method 'clip' (semantic dedup) is not available yet. "
+            "Use phash / dhash / ahash; CLIP-based dedup arrives with Tier 2."
+        )
+        raise typer.Exit(1)
+    if method not in ("phash", "dhash", "ahash"):
+        console.print(f"[red]Error:[/red] Unknown --method '{method}'. Choose phash, dhash, or ahash.")
+        raise typer.Exit(1)
+
+    cam_list = [c.strip() for c in cameras.split(",")] if cameras else None
+    config = DedupConfig(
+        method=method,
+        threshold=threshold,
+        keyframes=keyframes,
+        hash_size=hash_size,
+        cameras=cam_list,
+    )
+
+    resolved_path = _resolve_dataset_path(source)
+    if not resolved_path.exists():
+        console.print(f"[red]Error:[/red] Dataset not found: {resolved_path}")
+        raise typer.Exit(1)
+
+    dry_run = output is None
+    if dry_run:
+        console.print(f"[cyan]Dedup dry-run:[/cyan] {source}")
+    else:
+        console.print(f"[cyan]Deduplicating:[/cyan] {source} [dim]→[/dim] {output}")
+    console.print(f"[dim]method={method}  threshold={threshold:g}  keyframes={keyframes}  hash_size={hash_size}[/dim]")
+    console.print()
+
+    engine = DedupEngine(config)
+    try:
+        with Progress(
+            TextColumn("[bold green]{task.description}"),
+            BarColumn(),
+            MofNCompleteColumn(),
+            console=console,
+        ) as progress:
+            sig_task = progress.add_task("Hashing episodes...", total=None)
+            cmp_task = progress.add_task("Comparing episodes...", total=None)
+
+            def on_progress(stage: str, current: int, total: int) -> None:
+                if stage == "signature":
+                    progress.update(sig_task, completed=current + 1)
+                elif stage == "compare" and total > 0:
+                    progress.update(cmp_task, total=total, completed=current)
+
+            result = engine.analyze(resolved_path, progress_callback=on_progress)
+    except ForgeError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1)
+
+    console.print()
+
+    # Show duplicate clusters
+    if result.clusters:
+        table = Table(show_header=True, header_style="bold", title="Duplicate clusters")
+        table.add_column("Keep (representative)", style="green")
+        table.add_column("Drop (near-duplicates)", style="red")
+        table.add_column("Distance", justify="right")
+        for cluster in result.clusters[:50]:
+            dups = ", ".join(d for d, _ in cluster.duplicates)
+            dists = ", ".join(f"{dist:.3f}" for _, dist in cluster.duplicates)
+            table.add_row(cluster.representative, dups, dists)
+        console.print(table)
+        if len(result.clusters) > 50:
+            console.print(f"[dim]... and {len(result.clusters) - 50} more clusters[/dim]")
+        console.print()
+
+    # Write if requested — delegate to the filter engine (one writer path).
+    output_written = False
+    if not dry_run and result.dropped_ids:
+        from forge.filter.engine import FilterConfig, FilterEngine
+
+        fengine = FilterEngine(FilterConfig(exclude_episodes=result.dropped_ids))
+        try:
+            fresult = fengine.filter(source=resolved_path, output=output)
+            output_written = fresult.success
+            if fresult.errors:
+                for err in fresult.errors[:5]:
+                    console.print(f"[red]Write error:[/red] {err}")
+        except ForgeError as e:
+            console.print(f"[red]Error writing output:[/red] {e}")
+            raise typer.Exit(1)
+    elif not dry_run:
+        console.print("[yellow]No duplicates found — nothing to write.[/yellow]")
+
+    # Summary
+    lines: list[str] = []
+    lines.append(f"Total episodes: {result.total_episodes}")
+    lines.append(f"Unique (kept): [green]{result.num_unique}[/green]")
+    lines.append(f"Near-duplicates (dropped): [red]{result.num_duplicates}[/red]  in {len(result.clusters)} clusters")
+    if result.num_uncomparable:
+        lines.append(f"[dim]No camera frames (kept as-is): {result.num_uncomparable}[/dim]")
+    if output_written:
+        lines.append(f"Output: [bold]{output}[/bold]")
+    for err in result.errors[:5]:
+        lines.append(f"[red]Error:[/red] {err}")
+
+    console.print(
+        Panel(
+            "\n".join(lines),
+            title=f"Dedup {'Preview' if dry_run else 'Result'}",
+            border_style="blue",
+            padding=(1, 2),
+        )
+    )
+
+    if dry_run and result.num_duplicates > 0:
+        console.print(
+            f"\n[dim]Run with output path to write deduplicated dataset:[/dim]"
+            f"\n  forge dedup {source} ./deduped --method {method} --threshold {threshold:g}"
+        )
+
+
 # --- Registry subcommands ---
 
 
