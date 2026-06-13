@@ -2147,12 +2147,17 @@ def filter_cmd(
     output: Path | None = typer.Argument(None, help="Output path for filtered dataset (omit for dry-run)"),
     min_quality: float | None = typer.Option(None, "--min-quality", "-q", help="Keep episodes with overall_score >= this value (0-10)"),
     exclude_flags: str | None = typer.Option(None, "--exclude-flags", help="Exclude episodes with ANY of these flags (comma-separated)"),
+    min_sharpness: float | None = typer.Option(None, "--min-sharpness", help="[video] Exclude episodes whose min camera sharpness is below this (var-of-Laplacian)"),
+    max_frozen: float | None = typer.Option(None, "--max-frozen", help="[video] Exclude episodes whose frozen-frame fraction exceeds this (0-1)"),
+    max_overexposed: float | None = typer.Option(None, "--max-overexposed", help="[video] Exclude episodes whose overexposed fraction exceeds this (0-1)"),
+    max_underexposed: float | None = typer.Option(None, "--max-underexposed", help="[video] Exclude episodes whose underexposed fraction exceeds this (0-1)"),
     include_episodes: str | None = typer.Option(None, "--include-episodes", help="Only include these episode IDs (comma-separated)"),
     exclude_episodes: str | None = typer.Option(None, "--exclude-episodes", help="Exclude these episode IDs (comma-separated)"),
     from_report: Path | None = typer.Option(None, "--from-report", "-r", help="Use pre-computed quality report JSON"),
     gripper_dim: int = typer.Option(-1, "--gripper-dim", "-g", help="Gripper dimension index (-1 = last)"),
     fps: float = typer.Option(30.0, "--fps", "-f", help="Fallback FPS if timestamps unavailable"),
     action_bounds: str | None = typer.Option(None, "--action-bounds", help="Known action bounds as 'min,max'"),
+    video_stride: int = typer.Option(1, "--video-stride", help="[video] Analyze every Nth image-bearing frame during live analysis"),
 ) -> None:
     """Filter dataset episodes based on quality scores and flags.
 
@@ -2160,10 +2165,16 @@ def filter_cmd(
     writes only passing episodes to the output (same format). If no output
     path is given, runs in dry-run mode and prints a summary.
 
+    Video (Tier 0) criteria — --min-sharpness, --max-frozen, --max-overexposed,
+    --max-underexposed, and the video flags (blurry, frozen_frames, over_exposed,
+    under_exposed) via --exclude-flags — trigger live video analysis automatically,
+    or read video fields straight from a --from-report JSON.
+
     Examples:
         forge filter ./dataset                                    # Dry-run
         forge filter ./dataset ./filtered --min-quality 6.0
         forge filter ./dataset ./filtered --exclude-flags jerky,mostly_static
+        forge filter ./dataset ./filtered --min-sharpness 80 --exclude-flags frozen_frames
         forge filter ./dataset ./filtered --from-report report.json --min-quality 7.0
     """
     from rich.panel import Panel
@@ -2195,12 +2206,17 @@ def filter_cmd(
     config = FilterConfig(
         min_quality=min_quality,
         exclude_flags=flags_list,
+        min_sharpness=min_sharpness,
+        max_frozen_fraction=max_frozen,
+        max_overexposed_fraction=max_overexposed,
+        max_underexposed_fraction=max_underexposed,
         include_episodes=include_list,
         exclude_episodes=exclude_list,
         from_report=from_report,
         gripper_dim=gripper_dim,
         fps=fps,
         action_bounds=bounds,
+        video_stride=video_stride,
     )
 
     # Resolve source
@@ -2222,6 +2238,14 @@ def filter_cmd(
         criteria.append(f"min_quality={min_quality}")
     if flags_list:
         criteria.append(f"exclude_flags=[{', '.join(flags_list)}]")
+    if min_sharpness is not None:
+        criteria.append(f"min_sharpness={min_sharpness:g}")
+    if max_frozen is not None:
+        criteria.append(f"max_frozen={max_frozen:g}")
+    if max_overexposed is not None:
+        criteria.append(f"max_overexposed={max_overexposed:g}")
+    if max_underexposed is not None:
+        criteria.append(f"max_underexposed={max_underexposed:g}")
     if include_list:
         criteria.append(f"include={len(include_list)} episodes")
     if exclude_list:

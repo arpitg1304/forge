@@ -18,6 +18,11 @@ from forge.quality.models import EpisodeQuality, QualityReport
 logger = logging.getLogger(__name__)
 
 
+# Flags produced by the Tier 0 video analyzer — used to decide whether
+# --exclude-flags requires video analysis during live filtering.
+_VIDEO_FLAGS = frozenset({"blurry", "over_exposed", "under_exposed", "frozen_frames"})
+
+
 @dataclass
 class FilterConfig:
     """Configuration for a filter operation."""
@@ -25,6 +30,12 @@ class FilterConfig:
     # Quality-based filters
     min_quality: float | None = None
     exclude_flags: list[str] | None = None
+
+    # Video (Tier 0) numeric filters — keep episodes within these bounds.
+    min_sharpness: float | None = None          # reject if video min_sharpness < this
+    max_frozen_fraction: float | None = None    # reject if frozen_fraction > this
+    max_overexposed_fraction: float | None = None
+    max_underexposed_fraction: float | None = None
 
     # Explicit episode selection
     include_episodes: list[str] | None = None
@@ -37,6 +48,10 @@ class FilterConfig:
     gripper_dim: int = -1
     fps: float = 30.0
     action_bounds: tuple[float, float] | None = None
+
+    # Video analysis controls (live mode only)
+    video_downscale: int = 128
+    video_stride: int = 1
 
 
 @dataclass
@@ -131,7 +146,15 @@ class FilterEngine:
                 fps=self.config.fps,
                 action_bounds=self.config.action_bounds,
             )
-            analyzer = QualityAnalyzer(config=qconfig)
+            video_config = None
+            if self._needs_video_analysis():
+                from forge.quality.video import VideoQualityConfig
+
+                video_config = VideoQualityConfig(
+                    downscale=self.config.video_downscale,
+                    sample_stride=self.config.video_stride,
+                )
+            analyzer = QualityAnalyzer(config=qconfig, video_config=video_config)
 
         # 5. Configure writer
         if writer is not None and hasattr(writer, "config"):
@@ -194,7 +217,29 @@ class FilterEngine:
         return (
             self.config.min_quality is not None
             or self.config.exclude_flags is not None
+            or self._needs_video_analysis()
         )
+
+    def _needs_video_analysis(self) -> bool:
+        """Check if any criterion requires Tier 0 video metrics.
+
+        True when a numeric video threshold is set, or when --exclude-flags
+        names a video flag (which the analyzer only produces with video on).
+        """
+        c = self.config
+        if any(
+            v is not None
+            for v in (
+                c.min_sharpness,
+                c.max_frozen_fraction,
+                c.max_overexposed_fraction,
+                c.max_underexposed_fraction,
+            )
+        ):
+            return True
+        if c.exclude_flags and any(f in _VIDEO_FLAGS for f in c.exclude_flags):
+            return True
+        return False
 
     def _evaluate_episode(
         self, episode_id: str, eq: EpisodeQuality | None
@@ -237,7 +282,64 @@ class FilterEngine:
                 if flag in eq.flags:
                     reasons.append(f"flag: {flag}")
 
+        # Video (Tier 0) numeric filters
+        self._evaluate_video(episode_id, eq, reasons)
+
         if reasons:
             return False, reasons
 
         return True, []
+
+    def _evaluate_video(
+        self, episode_id: str, eq: EpisodeQuality | None, reasons: list[str]
+    ) -> None:
+        """Append exclusion reasons for any failed Tier 0 video threshold."""
+        c = self.config
+        video_criteria = (
+            c.min_sharpness,
+            c.max_frozen_fraction,
+            c.max_overexposed_fraction,
+            c.max_underexposed_fraction,
+        )
+        if all(v is None for v in video_criteria):
+            return
+
+        vq = eq.video if eq is not None else None
+        if vq is None:
+            logger.warning(
+                "No video metrics for %s — skipping video filters "
+                "(run quality with --video, or a report that has video fields)",
+                episode_id,
+            )
+            return
+
+        if (
+            c.min_sharpness is not None
+            and vq.min_sharpness is not None
+            and vq.min_sharpness < c.min_sharpness
+        ):
+            reasons.append(f"sharpness {vq.min_sharpness:.0f} < min {c.min_sharpness:g}")
+        if (
+            c.max_frozen_fraction is not None
+            and vq.frozen_fraction is not None
+            and vq.frozen_fraction > c.max_frozen_fraction
+        ):
+            reasons.append(
+                f"frozen {vq.frozen_fraction:.2f} > max {c.max_frozen_fraction:g}"
+            )
+        if (
+            c.max_overexposed_fraction is not None
+            and vq.overexposed_fraction is not None
+            and vq.overexposed_fraction > c.max_overexposed_fraction
+        ):
+            reasons.append(
+                f"overexposed {vq.overexposed_fraction:.2f} > max {c.max_overexposed_fraction:g}"
+            )
+        if (
+            c.max_underexposed_fraction is not None
+            and vq.underexposed_fraction is not None
+            and vq.underexposed_fraction > c.max_underexposed_fraction
+        ):
+            reasons.append(
+                f"underexposed {vq.underexposed_fraction:.2f} > max {c.max_underexposed_fraction:g}"
+            )

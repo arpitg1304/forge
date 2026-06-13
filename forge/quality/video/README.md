@@ -71,8 +71,22 @@ eq.flags      # video flags are merged in alongside proprio flags
 `VideoQuality` attaches to `EpisodeQuality.video`. Headline scalars are flattened
 into the per-episode report row (`video_min_sharpness`, `video_blurry_fraction`,
 `video_frozen_fraction`, …), and video flags merge into `flags` — so they compose
-with `forge filter --exclude-flags blurry,frozen_frames` for free. Numeric video
-filter criteria (`--max-blur`, `--min-motion`) arrive in a later PR.
+with `forge filter` for free, both as flags and as numeric thresholds:
+
+```bash
+# Flags
+forge filter ./ds ./clean --exclude-flags blurry,frozen_frames
+
+# Numeric Tier 0 thresholds (trigger live video analysis automatically)
+forge filter ./ds ./clean --min-sharpness 80 --max-frozen 0.5
+forge filter ./ds ./clean --max-overexposed 0.25 --max-underexposed 0.25
+
+# Or read video fields straight from a report
+forge quality ./ds --video --export report.json
+forge filter ./ds ./clean --from-report report.json --min-sharpness 80
+```
+
+`--min-motion` (motion magnitude) is a Tier 1 concept and arrives with optical flow.
 
 ## Roadmap
 
