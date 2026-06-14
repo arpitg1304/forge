@@ -1833,6 +1833,7 @@ def quality_cmd(
     export_flagged: Path | None = typer.Option(None, "--export-flagged", help="Export flagged episode IDs to JSON"),
     quick: bool = typer.Option(False, "--quick", "-q", help="Quick mode (sample 50 episodes)"),
     action_bounds: str | None = typer.Option(None, "--action-bounds", help="Known action bounds as 'min,max' (e.g., '-1,1')"),
+    workers: int = typer.Option(1, "--workers", "-w", help="Parallel worker processes (1 = sequential)"),
     video: bool = typer.Option(False, "--video", help="Also analyze camera streams (Tier 0 pixel metrics)"),
     video_level: str = typer.Option("pixel", "--video-level", help="Video tier: 'pixel' (Tier 0) or 'motion' (Tier 1: optical flow). 'semantic' coming soon."),
     video_downscale: int = typer.Option(128, "--video-downscale", help="Longest side (px) of the analysis frame"),
@@ -1923,7 +1924,6 @@ def quality_cmd(
     console.print()
 
     # Analyze with progress bar
-    analyzer = QualityAnalyzer(config=config, video_config=video_config)
     from collections import defaultdict
 
     from forge.quality.models import QualityReport
@@ -1931,29 +1931,72 @@ def quality_cmd(
     report = QualityReport(dataset_path=str(path))
     flagged: dict[str, list[str]] = defaultdict(list)
 
+    def _record(eq) -> None:
+        report.per_episode.append(eq)
+        for flag in eq.flags:
+            flagged[flag].append(eq.episode_id)
+
+    # Determine the episode count for parallel chunking (only when needed).
+    parallel_total = 0
+    if workers > 1:
+        if sample > 0:
+            parallel_total = sample
+        else:
+            try:
+                parallel_total = reader.inspect(resolved_path).num_episodes or 0
+            except ForgeError:
+                parallel_total = 0
+        if parallel_total <= 1:
+            workers = 1  # nothing to parallelize
+
     try:
-        with Progress(
-            TextColumn("[bold green]{task.description}"),
-            BarColumn(),
-            MofNCompleteColumn(),
-            console=console,
-        ) as progress:
-            task = progress.add_task("Analyzing episodes...", total=sample or None)
+        if workers > 1:
+            from forge.quality.parallel import analyze_parallel
 
-            for i, episode in enumerate(reader.read_episodes(resolved_path)):
-                if sample > 0 and i >= sample:
-                    break
+            with Progress(
+                TextColumn("[bold green]{task.description}"),
+                BarColumn(),
+                MofNCompleteColumn(),
+                console=console,
+            ) as progress:
+                task = progress.add_task(
+                    f"Analyzing episodes ({workers} workers)...", total=parallel_total
+                )
 
-                eq = analyzer.analyze_episode(episode)
-                report.per_episode.append(eq)
+                def on_progress(done: int, total: int) -> None:
+                    progress.update(task, completed=done, total=total)
 
-                for flag in eq.flags:
-                    flagged[flag].append(eq.episode_id)
+                episodes, errors = analyze_parallel(
+                    resolved_path,
+                    format_name,
+                    parallel_total,
+                    config,
+                    video_config,
+                    num_workers=workers,
+                    progress_callback=on_progress,
+                )
+            for eq in episodes:
+                _record(eq)
+            for err in errors[:5]:
+                console.print(f"[yellow]Skipped episode:[/yellow] {err}")
+        else:
+            analyzer = QualityAnalyzer(config=config, video_config=video_config)
+            with Progress(
+                TextColumn("[bold green]{task.description}"),
+                BarColumn(),
+                MofNCompleteColumn(),
+                console=console,
+            ) as progress:
+                task = progress.add_task("Analyzing episodes...", total=sample or None)
 
-                progress.advance(task)
+                for i, episode in enumerate(reader.read_episodes(resolved_path)):
+                    if sample > 0 and i >= sample:
+                        break
+                    _record(analyzer.analyze_episode(episode))
+                    progress.advance(task)
 
-            if sample == 0:
-                progress.update(task, total=len(report.per_episode), completed=len(report.per_episode))
+                if sample == 0:
+                    progress.update(task, total=len(report.per_episode), completed=len(report.per_episode))
 
     except ForgeError as e:
         console.print(f"[red]Error reading dataset:[/red] {e}")
