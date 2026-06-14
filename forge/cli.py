@@ -1834,7 +1834,7 @@ def quality_cmd(
     quick: bool = typer.Option(False, "--quick", "-q", help="Quick mode (sample 50 episodes)"),
     action_bounds: str | None = typer.Option(None, "--action-bounds", help="Known action bounds as 'min,max' (e.g., '-1,1')"),
     video: bool = typer.Option(False, "--video", help="Also analyze camera streams (Tier 0 pixel metrics)"),
-    video_level: str = typer.Option("pixel", "--video-level", help="Video metric tier: 'pixel' (Tier 0). motion/semantic coming soon."),
+    video_level: str = typer.Option("pixel", "--video-level", help="Video tier: 'pixel' (Tier 0) or 'motion' (Tier 1: optical flow). 'semantic' coming soon."),
     video_downscale: int = typer.Option(128, "--video-downscale", help="Longest side (px) of the analysis frame"),
     video_stride: int = typer.Option(1, "--video-stride", help="Analyze every Nth image-bearing frame"),
     video_max_frames: int = typer.Option(0, "--video-max-frames", help="Cap analyzed frames per camera (0 = all)"),
@@ -1883,16 +1883,17 @@ def quality_cmd(
     # Video (Tier 0) config — only built when --video is passed.
     video_config = None
     if video:
-        if video_level != "pixel":
+        if video_level not in ("pixel", "motion"):
             console.print(
-                f"[red]Error:[/red] --video-level '{video_level}' not available yet. "
-                "Tier 0 ('pixel') is the only supported level; motion/semantic are coming soon."
+                f"[red]Error:[/red] --video-level '{video_level}' not available. "
+                "Use 'pixel' (Tier 0) or 'motion' (Tier 1); 'semantic' is coming soon."
             )
             raise typer.Exit(1)
         from forge.quality.video import VideoQualityConfig
 
         cam_list = [c.strip() for c in video_cameras.split(",")] if video_cameras else None
         video_config = VideoQualityConfig(
+            level=video_level,
             downscale=video_downscale,
             sample_stride=video_stride,
             max_frames=video_max_frames,
@@ -2086,9 +2087,11 @@ def quality_cmd(
             ]
             return float(np.mean(vals)) if vals else None
 
+        has_motion = any(eq.video.mean_motion is not None for eq in vid_eps)
+        tier_label = "Tier 0+1 — pixel + motion" if has_motion else "Tier 0 — pixel"
         lines.append("")
         lines.append(
-            f"[bold]Video[/bold] [dim](Tier 0 — pixel, {len(vid_eps)} episodes, "
+            f"[bold]Video[/bold] [dim]({tier_label}, {len(vid_eps)} episodes, "
             f"{len(cams)} camera{'s' if len(cams) != 1 else ''})[/dim]"
         )
 
@@ -2106,6 +2109,21 @@ def quality_cmd(
         color = _vid_mean("mean_colorfulness")
         if color is not None:
             lines.append(f"  {'Colorfulness':<26} {color:.1f}  [dim](scene diversity)[/dim]")
+
+        # Tier 1 motion (only present with --video-level motion)
+        motion = _vid_mean("mean_motion")
+        if motion is not None:
+            _vid_line("Motion (px/frame)", motion, "no_motion", ".2f")
+            _vid_line("Motion smoothness (LDLJ)", _vid_mean("motion_smoothness"), "shaky", ".1f")
+            scene = _vid_mean("scene_motion_fraction")
+            if scene is not None:
+                lines.append(
+                    f"  {'Scene-motion fraction':<26} {scene:.2f}  "
+                    f"[dim](object vs camera motion)[/dim]"
+                )
+            n_cut = len(report.flagged_episodes.get("cut_detected", []))
+            if n_cut:
+                lines.append(f"  {'Cuts detected':<26} [yellow]{n_cut} episodes[/yellow]")
 
     # Top issues
     if report.flags:
@@ -2151,6 +2169,7 @@ def filter_cmd(
     max_frozen: float | None = typer.Option(None, "--max-frozen", help="[video] Exclude episodes whose frozen-frame fraction exceeds this (0-1)"),
     max_overexposed: float | None = typer.Option(None, "--max-overexposed", help="[video] Exclude episodes whose overexposed fraction exceeds this (0-1)"),
     max_underexposed: float | None = typer.Option(None, "--max-underexposed", help="[video] Exclude episodes whose underexposed fraction exceeds this (0-1)"),
+    min_motion: float | None = typer.Option(None, "--min-motion", help="[video, Tier 1] Exclude episodes whose mean optical-flow motion is below this (px/frame)"),
     include_episodes: str | None = typer.Option(None, "--include-episodes", help="Only include these episode IDs (comma-separated)"),
     exclude_episodes: str | None = typer.Option(None, "--exclude-episodes", help="Exclude these episode IDs (comma-separated)"),
     from_report: Path | None = typer.Option(None, "--from-report", "-r", help="Use pre-computed quality report JSON"),
@@ -2210,6 +2229,7 @@ def filter_cmd(
         max_frozen_fraction=max_frozen,
         max_overexposed_fraction=max_overexposed,
         max_underexposed_fraction=max_underexposed,
+        min_motion=min_motion,
         include_episodes=include_list,
         exclude_episodes=exclude_list,
         from_report=from_report,
@@ -2246,6 +2266,8 @@ def filter_cmd(
         criteria.append(f"max_overexposed={max_overexposed:g}")
     if max_underexposed is not None:
         criteria.append(f"max_underexposed={max_underexposed:g}")
+    if min_motion is not None:
+        criteria.append(f"min_motion={min_motion:g}")
     if include_list:
         criteria.append(f"include={len(include_list)} episodes")
     if exclude_list:

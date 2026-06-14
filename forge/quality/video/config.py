@@ -21,6 +21,9 @@ class VideoQualityConfig:
         Frozen frames: consecutive-frame MAE for encoder-stall / static video.
     """
 
+    # ── Tier selection ──
+    level: str = "pixel"                 # "pixel" (Tier 0) | "motion" (Tier 0 + Tier 1)
+
     # ── Decode / frame sampling ──
     downscale: int = 128                 # longest side (px) of the analysis frame
     sample_stride: int = 1               # analyze every Nth frame that carries images
@@ -50,3 +53,12 @@ class VideoQualityConfig:
     frozen_mae: float = 0.1              # MAE below this between consecutive frames = frozen
     frozen_run_flag: int = 10            # longest frozen run above this => 'frozen_frames'
     frozen_fraction_flag: float = 0.50   # or >50% frozen transitions => 'frozen_frames'
+
+    # ── Tier 1: motion (Farnebäck dense optical flow; opencv) ──
+    motion_downscale: int = 64           # flow is O(pixels); analyze on a small frame
+    motion_low_flag: float = 0.05        # mean flow (px/frame) below this => 'no_motion'
+    motion_smoothness_flag: float = -28.0  # pixel-space LDLJ below this => 'shaky'
+    # A shot cut needs BOTH a luma-histogram discontinuity AND a flow spike, so a
+    # gradual content change isn't mistaken for a cut.
+    cut_hist_corr: float = 0.3           # histogram correlation below this, AND ...
+    cut_flow_factor: float = 5.0         # ... flow above this × the episode median => a cut

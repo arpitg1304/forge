@@ -18,9 +18,11 @@ from forge.quality.models import EpisodeQuality, QualityReport
 logger = logging.getLogger(__name__)
 
 
-# Flags produced by the Tier 0 video analyzer — used to decide whether
-# --exclude-flags requires video analysis during live filtering.
+# Flags produced by the video analyzer — used to decide whether --exclude-flags
+# requires video analysis during live filtering.
 _VIDEO_FLAGS = frozenset({"blurry", "over_exposed", "under_exposed", "frozen_frames"})
+# Flags that need Tier 1 (optical flow), which is pricier than Tier 0 pixel stats.
+_MOTION_FLAGS = frozenset({"no_motion", "shaky", "cut_detected"})
 
 
 @dataclass
@@ -36,6 +38,9 @@ class FilterConfig:
     max_frozen_fraction: float | None = None    # reject if frozen_fraction > this
     max_overexposed_fraction: float | None = None
     max_underexposed_fraction: float | None = None
+
+    # Video (Tier 1) numeric filters — trigger optical-flow analysis.
+    min_motion: float | None = None             # reject if mean_motion < this (px/frame)
 
     # Explicit episode selection
     include_episodes: list[str] | None = None
@@ -151,6 +156,7 @@ class FilterEngine:
                 from forge.quality.video import VideoQualityConfig
 
                 video_config = VideoQualityConfig(
+                    level="motion" if self._needs_motion_analysis() else "pixel",
                     downscale=self.config.video_downscale,
                     sample_stride=self.config.video_stride,
                 )
@@ -221,7 +227,7 @@ class FilterEngine:
         )
 
     def _needs_video_analysis(self) -> bool:
-        """Check if any criterion requires Tier 0 video metrics.
+        """Check if any criterion requires video metrics (Tier 0 or Tier 1).
 
         True when a numeric video threshold is set, or when --exclude-flags
         names a video flag (which the analyzer only produces with video on).
@@ -237,7 +243,18 @@ class FilterEngine:
             )
         ):
             return True
+        if self._needs_motion_analysis():
+            return True
         if c.exclude_flags and any(f in _VIDEO_FLAGS for f in c.exclude_flags):
+            return True
+        return False
+
+    def _needs_motion_analysis(self) -> bool:
+        """Check if any criterion requires Tier 1 (optical-flow) metrics."""
+        c = self.config
+        if c.min_motion is not None:
+            return True
+        if c.exclude_flags and any(f in _MOTION_FLAGS for f in c.exclude_flags):
             return True
         return False
 
@@ -293,13 +310,14 @@ class FilterEngine:
     def _evaluate_video(
         self, episode_id: str, eq: EpisodeQuality | None, reasons: list[str]
     ) -> None:
-        """Append exclusion reasons for any failed Tier 0 video threshold."""
+        """Append exclusion reasons for any failed video (Tier 0/1) threshold."""
         c = self.config
         video_criteria = (
             c.min_sharpness,
             c.max_frozen_fraction,
             c.max_overexposed_fraction,
             c.max_underexposed_fraction,
+            c.min_motion,
         )
         if all(v is None for v in video_criteria):
             return
@@ -343,3 +361,9 @@ class FilterEngine:
             reasons.append(
                 f"underexposed {vq.underexposed_fraction:.2f} > max {c.max_underexposed_fraction:g}"
             )
+        if (
+            c.min_motion is not None
+            and vq.mean_motion is not None
+            and vq.mean_motion < c.min_motion
+        ):
+            reasons.append(f"motion {vq.mean_motion:.2f} < min {c.min_motion:g}")

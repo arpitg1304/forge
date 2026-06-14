@@ -86,12 +86,36 @@ forge quality ./ds --video --export report.json
 forge filter ./ds ./clean --from-report report.json --min-sharpness 80
 ```
 
-`--min-motion` (motion magnitude) is a Tier 1 concept and arrives with optical flow.
+`--min-motion` is a Tier 1 metric (see below) and auto-triggers optical-flow analysis.
+
+## Tier 1 — motion (`--video-level motion`)
+
+Classical optical flow (Farnebäck dense flow, opencv) on a small frame
+(`motion_downscale`, default 64). Requires the `[video]` extra; without opencv the
+metrics raise a helpful install error rather than a bare `ImportError`.
+
+| Metric | What it catches | Flag |
+|---|---|---|
+| **Motion magnitude** (mean flow, px/frame) | low-signal episodes where nothing moves | `no_motion` |
+| **Motion smoothness** (pixel-space LDLJ of the global-motion path) | shaky / jittery video, frame-drop-then-jump | `shaky` |
+| **Camera-vs-scene split** (global-affine fit; residual = object motion) | a moving wrist-cam vs an active scene | — |
+| **Shot/cut detection** (histogram discontinuity **and** flow spike) | corrupted / concatenated episodes (a robot episode has no cuts) | `cut_detected` |
+
+`no_motion` is decided at the **episode** level (the most-active camera must be
+below threshold), so one moving camera keeps the episode "in motion". A cut needs
+**both** a luma-histogram drop and a flow spike relative to the episode's median,
+so gradual content change isn't mistaken for a cut. Optical flow against a
+blank/uniform frame is skipped (meaningless, and dodges occasional decoder black
+frames).
+
+```bash
+forge quality ./ds --video --video-level motion
+forge filter  ./ds ./clean --min-motion 0.1          # drop low-signal episodes
+forge filter  ./ds ./clean --exclude-flags cut_detected,shaky
+```
 
 ## Roadmap
 
-- **Tier 1 (motion)** — optical-flow magnitude/smoothness, camera-vs-scene split,
-  shot/cut detection. `--video-level motion`.
 - **Tier 2 (semantic)** — CLIP/SigLIP embeddings, semantic temporal coherence,
   text–image alignment against the language instruction. `--video-level semantic`.
 

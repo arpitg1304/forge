@@ -23,7 +23,7 @@ from forge.quality.video.pixel import (
 
 
 class _CameraAccumulator:
-    """Per-camera streaming accumulator for Tier 0 metrics."""
+    """Per-camera streaming accumulator for Tier 0 (and optional Tier 1) metrics."""
 
     def __init__(self, camera: str, config: VideoQualityConfig) -> None:
         self.camera = camera
@@ -39,6 +39,14 @@ class _CameraAccumulator:
         self._color: list[float] = []
         self._frozen: list[bool] = []
         self._prev_gray: np.ndarray | None = None
+
+        # Tier 1 motion state (used only when config.level == "motion")
+        self._motion_mag: list[float] = []
+        self._global_vel: list[tuple[float, float]] = []
+        self._scene_frac: list[float] = []
+        self._hist_corr: list[float] = []
+        self._prev_motion_u8: np.ndarray | None = None
+        self._motion_design: np.ndarray | None = None
 
     def update(self, img) -> None:
         cfg = self.config
@@ -66,7 +74,46 @@ class _CameraAccumulator:
             self._frozen.append(frame_mae(gray, self._prev_gray) < cfg.frozen_mae)
         self._prev_gray = gray
 
+        if cfg.level == "motion":
+            self._update_motion(a)
+
         self.num_frames += 1
+
+    def _update_motion(self, img) -> None:
+        """Compute optical-flow metrics against the previous frame."""
+        from forge.quality.video.motion import (
+            affine_design,
+            camera_scene_split,
+            dense_flow,
+            flow_magnitude,
+            histogram_correlation,
+            to_uint8_gray,
+        )
+
+        cfg = self.config
+        gray_m, _ = prepare(img, cfg.motion_downscale)
+        cur = to_uint8_gray(gray_m)
+        # Optical flow against a blank/uniform frame is meaningless (and dodges a
+        # decoder that hands back the occasional black frame): keep the last good
+        # frame as the reference and skip this pair entirely.
+        if float(cur.std()) < 1.0:
+            return
+        prev = self._prev_motion_u8
+        self._prev_motion_u8 = cur
+        if prev is None or prev.shape != cur.shape:
+            return
+
+        stride = max(1, cfg.sample_stride)
+        flow = dense_flow(prev, cur)
+        # Normalize by stride so magnitude is per original frame, not per sample.
+        self._motion_mag.append(float(flow_magnitude(flow).mean()) / stride)
+        self._global_vel.append((float(flow[..., 0].mean()), float(flow[..., 1].mean())))
+        self._hist_corr.append(histogram_correlation(prev, cur))
+
+        if self._motion_design is None:
+            self._motion_design = affine_design(cur.shape[0], cur.shape[1])
+        resid, total = camera_scene_split(flow, self._motion_design)
+        self._scene_frac.append(resid / (total + 1e-6))
 
     def finalize(self) -> CameraVideoQuality:
         cfg = self.config
@@ -95,7 +142,7 @@ class _CameraAccumulator:
             cam.frozen_fraction = float(np.mean(self._frozen))
             cam.longest_frozen_run = longest_true_run(self._frozen)
 
-        # ── Flags ──
+        # ── Tier 0 flags ──
         if cam.blurry_fraction > cfg.blurry_fraction_flag:
             cam.flags.append("blurry")
         if cam.overexposed_fraction > cfg.exposure_flag:
@@ -107,6 +154,35 @@ class _CameraAccumulator:
             or (cam.frozen_fraction is not None and cam.frozen_fraction > cfg.frozen_fraction_flag)
         ):
             cam.flags.append("frozen_frames")
+
+        # ── Tier 1 motion ──
+        if self._motion_mag:
+            mags = np.asarray(self._motion_mag)
+            cam.mean_motion = float(mags.mean())
+            cam.scene_motion_fraction = float(np.mean(self._scene_frac))
+            # A cut needs both a histogram discontinuity and a flow spike relative
+            # to the episode's own motion — neither alone is enough.
+            corr = np.asarray(self._hist_corr)
+            median_mag = float(np.median(mags)) if mags.size else 0.0
+            spike = mags > cfg.cut_flow_factor * max(median_mag, 1e-6)
+            cam.cut_count = int(np.count_nonzero((corr < cfg.cut_hist_corr) & spike))
+            if len(self._global_vel) >= 3:
+                # LDLJ of the cumulative global-motion path (camera trajectory).
+                from forge.quality.metrics import log_dimensionless_jerk
+
+                path = np.cumsum(np.asarray(self._global_vel), axis=0)
+                cam.motion_smoothness = log_dimensionless_jerk(path, dt=1.0)
+
+            # 'shaky' and 'cut_detected' are per-camera; 'no_motion' is decided at
+            # the episode level (rollup), since one moving camera means the
+            # episode is not motionless.
+            if (
+                cam.motion_smoothness is not None
+                and cam.motion_smoothness < cfg.motion_smoothness_flag
+            ):
+                cam.flags.append("shaky")
+            if cam.cut_count and cam.cut_count > 0:
+                cam.flags.append("cut_detected")
 
         return cam
 
@@ -162,7 +238,7 @@ class VideoQualityAnalyzer:
         if not accums:
             return None
         per_camera = {name: acc.finalize() for name, acc in accums.items()}
-        return _build_rollup(per_camera)
+        return _build_rollup(per_camera, self.config)
 
     def analyze_episode(self, episode) -> VideoQuality | None:
         """Score an episode's camera streams in a single pass.
@@ -178,7 +254,10 @@ class VideoQualityAnalyzer:
         return self.finalize(accums)
 
 
-def _build_rollup(per_camera: dict[str, CameraVideoQuality]) -> VideoQuality:
+def _build_rollup(
+    per_camera: dict[str, CameraVideoQuality],
+    config: VideoQualityConfig,
+) -> VideoQuality:
     """Combine per-camera results into episode-level worst-case rollups."""
     vq = VideoQuality(per_camera=per_camera)
 
@@ -213,6 +292,21 @@ def _build_rollup(per_camera: dict[str, CameraVideoQuality]) -> VideoQuality:
     if color:
         vq.mean_colorfulness = float(np.mean(color))
 
+    # ── Tier 1 motion rollups ──
+    motion = _vals("mean_motion")
+    if motion:
+        # Most-active camera: an episode "has motion" if any camera does.
+        vq.mean_motion = float(max(motion))
+    smooth = _vals("motion_smoothness")
+    if smooth:
+        vq.motion_smoothness = float(min(smooth))  # most negative = jerkiest
+    scene = _vals("scene_motion_fraction")
+    if scene:
+        vq.scene_motion_fraction = float(max(scene))
+    cuts = _vals("cut_count")
+    if cuts:
+        vq.cut_count = int(max(cuts))
+
     # Union of per-camera flags (a flag fires if any camera raised it).
     seen: set[str] = set()
     for cam in per_camera.values():
@@ -220,5 +314,11 @@ def _build_rollup(per_camera: dict[str, CameraVideoQuality]) -> VideoQuality:
             if f not in seen:
                 seen.add(f)
                 vq.flags.append(f)
+
+    # 'no_motion' is episode-level: flag only if the most-active camera is below
+    # the threshold (so a single moving camera keeps the episode "in motion").
+    if vq.mean_motion is not None and vq.mean_motion < config.motion_low_flag:
+        if "no_motion" not in seen:
+            vq.flags.append("no_motion")
 
     return vq

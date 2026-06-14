@@ -27,6 +27,19 @@ def test_needs_video_analysis_via_video_flag():
     assert FilterEngine(FilterConfig(exclude_flags=["frozen_frames"]))._needs_video_analysis()
 
 
+def test_min_motion_needs_motion_analysis():
+    eng = FilterEngine(FilterConfig(min_motion=0.1))
+    assert eng._needs_video_analysis()
+    assert eng._needs_motion_analysis()
+
+
+def test_motion_flag_needs_motion_analysis():
+    assert FilterEngine(FilterConfig(exclude_flags=["no_motion"]))._needs_motion_analysis()
+    assert FilterEngine(FilterConfig(exclude_flags=["cut_detected"]))._needs_motion_analysis()
+    # Tier 0 criteria don't pull in the pricier optical-flow pass.
+    assert not FilterEngine(FilterConfig(min_sharpness=80))._needs_motion_analysis()
+
+
 def test_no_video_analysis_for_proprio_only():
     assert not FilterEngine(FilterConfig(min_quality=6.0))._needs_video_analysis()
     assert not FilterEngine(FilterConfig(exclude_flags=["jerky"]))._needs_video_analysis()
@@ -53,6 +66,19 @@ def test_min_sharpness_excludes_blurry():
 def test_min_sharpness_keeps_sharp():
     engine = FilterEngine(FilterConfig(min_sharpness=100))
     keep, _ = engine._evaluate_episode("ep", _eq_with_video(min_sharpness=500))
+    assert keep
+
+
+def test_min_motion_excludes_static():
+    engine = FilterEngine(FilterConfig(min_motion=0.2))
+    keep, reasons = engine._evaluate_episode("ep", _eq_with_video(mean_motion=0.01))
+    assert not keep
+    assert any("motion" in r for r in reasons)
+
+
+def test_min_motion_keeps_moving():
+    engine = FilterEngine(FilterConfig(min_motion=0.2))
+    keep, _ = engine._evaluate_episode("ep", _eq_with_video(mean_motion=1.5))
     assert keep
 
 

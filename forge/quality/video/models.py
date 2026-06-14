@@ -38,6 +38,12 @@ class CameraVideoQuality:
     # Scene diversity input
     mean_colorfulness: float | None = None
 
+    # Tier 1: motion (None unless level="motion")
+    mean_motion: float | None = None          # mean flow magnitude, px/frame
+    motion_smoothness: float | None = None    # pixel-space LDLJ (more negative = jerkier)
+    scene_motion_fraction: float | None = None  # residual / total flow (object vs camera)
+    cut_count: int | None = None
+
     flags: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
@@ -55,6 +61,10 @@ class CameraVideoQuality:
             "frozen_fraction": _round(self.frozen_fraction),
             "longest_frozen_run": self.longest_frozen_run,
             "mean_colorfulness": _round(self.mean_colorfulness),
+            "mean_motion": _round(self.mean_motion),
+            "motion_smoothness": _round(self.motion_smoothness),
+            "scene_motion_fraction": _round(self.scene_motion_fraction),
+            "cut_count": self.cut_count,
             "flags": self.flags,
         }
 
@@ -75,6 +85,12 @@ class VideoQuality:
     max_frozen_run: int = 0
     mean_colorfulness: float | None = None
 
+    # Tier 1: motion rollups
+    mean_motion: float | None = None
+    motion_smoothness: float | None = None
+    scene_motion_fraction: float | None = None
+    cut_count: int | None = None
+
     flags: list[str] = field(default_factory=list)
 
     def to_flat_dict(self) -> dict:
@@ -89,6 +105,10 @@ class VideoQuality:
             "video_frozen_fraction": _round(self.frozen_fraction),
             "video_max_frozen_run": self.max_frozen_run,
             "video_colorfulness": _round(self.mean_colorfulness),
+            "video_mean_motion": _round(self.mean_motion),
+            "video_motion_smoothness": _round(self.motion_smoothness),
+            "video_scene_motion_fraction": _round(self.scene_motion_fraction),
+            "video_cut_count": self.cut_count,
         }
 
     def to_dict(self) -> dict:
@@ -114,6 +134,10 @@ class VideoQuality:
             frozen_fraction=data.get("video_frozen_fraction"),
             max_frozen_run=data.get("video_max_frozen_run", 0) or 0,
             mean_colorfulness=data.get("video_colorfulness"),
+            mean_motion=data.get("video_mean_motion"),
+            motion_smoothness=data.get("video_motion_smoothness"),
+            scene_motion_fraction=data.get("video_scene_motion_fraction"),
+            cut_count=data.get("video_cut_count"),
         )
 
 
