@@ -164,7 +164,9 @@ class _CameraAccumulator:
             # to the episode's own motion — neither alone is enough.
             corr = np.asarray(self._hist_corr)
             median_mag = float(np.median(mags)) if mags.size else 0.0
-            spike = mags > cfg.cut_flow_factor * max(median_mag, 1e-6)
+            # Spike must clear both a relative (×median) and an absolute floor.
+            spike_thresh = max(cfg.cut_flow_factor * median_mag, cfg.cut_flow_min)
+            spike = mags > spike_thresh
             cam.cut_count = int(np.count_nonzero((corr < cfg.cut_hist_corr) & spike))
             if len(self._global_vel) >= 3:
                 # LDLJ of the cumulative global-motion path (camera trajectory).

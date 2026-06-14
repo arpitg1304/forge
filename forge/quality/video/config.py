@@ -58,7 +58,10 @@ class VideoQualityConfig:
     motion_downscale: int = 64           # flow is O(pixels); analyze on a small frame
     motion_low_flag: float = 0.05        # mean flow (px/frame) below this => 'no_motion'
     motion_smoothness_flag: float = -28.0  # pixel-space LDLJ below this => 'shaky'
-    # A shot cut needs BOTH a luma-histogram discontinuity AND a flow spike, so a
-    # gradual content change isn't mistaken for a cut.
+    # A shot cut needs a luma-histogram discontinuity AND a flow spike that clears
+    # BOTH a relative (×median) and an absolute floor — so a gradual content change
+    # isn't a cut, and a mere exposure/lighting jump on an otherwise-static camera
+    # (small absolute flow, large only relative to a near-zero median) isn't either.
     cut_hist_corr: float = 0.3           # histogram correlation below this, AND ...
-    cut_flow_factor: float = 5.0         # ... flow above this × the episode median => a cut
+    cut_flow_factor: float = 5.0         # ... flow above this × the episode median, AND ...
+    cut_flow_min: float = 1.5            # ... flow above this absolute floor (px/frame)

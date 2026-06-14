@@ -486,7 +486,12 @@ def state_conditioned_action_variance(
     # (T < 2k frames → <32 MB). For much longer episodes, swap in a KDTree.
     s = states.astype(np.float64, copy=False)
     sq_norm = (s * s).sum(axis=1)
-    dist_sq = sq_norm[:, None] + sq_norm[None, :] - 2.0 * (s @ s.T)
+    # numpy/BLAS can emit spurious divide/overflow/invalid RuntimeWarnings from
+    # the SIMD matmul path; they don't affect the result, so silence them here.
+    with np.errstate(divide="ignore", over="ignore", invalid="ignore"):
+        dist_sq = sq_norm[:, None] + sq_norm[None, :] - 2.0 * (s @ s.T)
+    # The expansion can yield tiny negatives from float error — clamp for safety.
+    np.maximum(dist_sq, 0.0, out=dist_sq)
     np.fill_diagonal(dist_sq, np.inf)  # never pick self as own neighbor
     nn_idx = np.argpartition(dist_sq, kth=k, axis=1)[:, :k]
 

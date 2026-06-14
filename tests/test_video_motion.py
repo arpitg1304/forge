@@ -96,6 +96,19 @@ def test_no_cut_in_continuous_motion():
     assert "cut_detected" not in vq.flags
 
 
+def test_exposure_jump_is_not_a_cut():
+    # A brightness step on an otherwise-static camera shifts the histogram
+    # (low correlation) but produces ~no flow — must clear the absolute flow
+    # floor to count, so it is NOT a cut.
+    scene = _bg(9, lo=0, hi=120)
+    images = [scene.copy() for _ in range(8)] + [
+        np.clip(scene.astype(np.int16) + 90, 0, 255).astype(np.uint8) for _ in range(8)
+    ]
+    vq = _analyze(images)
+    assert (vq.cut_count or 0) == 0
+    assert "cut_detected" not in vq.flags
+
+
 # ── Camera vs scene split ────────────────────────────────────────
 
 
