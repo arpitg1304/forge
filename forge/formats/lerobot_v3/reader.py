@@ -962,14 +962,27 @@ class LeRobotV3Reader:
                         cumulative_frames += 100000
                 video_frame_ranges[cam_name] = ranges
 
+        # First global frame index of this episode — used to convert a global
+        # index back to an episode-local one when the per-file ranges don't
+        # cover it (the one-episode-per-file layout below).
+        episode_first_global = (
+            int(ep_df.iloc[0]["index"]) if "index" in ep_df.columns and len(ep_df) else 0
+        )
+
         def find_video_for_frame(cam_name: str, global_idx: int) -> tuple[Path, int]:
             """Find the video file and local frame index for a global frame index."""
             if cam_name in video_frame_ranges:
                 for start, end, vpath in video_frame_ranges[cam_name]:
                     if start <= global_idx <= end:
                         return vpath, global_idx - start
-            # Fallback to single video file
-            return video_paths.get(cam_name, video_paths.get(list(video_paths.keys())[0])), global_idx
+            # Fallback: no range matched. This happens when each episode lives in
+            # its own video file (per-episode chunking) but info.json declares the
+            # multi-episode "{file_index}" template, so the index is global while
+            # the file starts at local frame 0. Convert global -> episode-local
+            # instead of seeking off the end of the file (which yields black frames).
+            local_idx = global_idx - episode_first_global
+            target = video_paths.get(cam_name, video_paths.get(list(video_paths.keys())[0]))
+            return target, local_idx
 
         def load_frames() -> Iterator[Frame]:
             for idx in range(len(ep_df)):
