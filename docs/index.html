@@ -761,6 +761,18 @@
       </div>
     </div>
 
+    <!-- Video Quality -->
+    <div class="feature-card c-teal">
+      <div class="feature-icon teal">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+      </div>
+      <div class="feature-title">Video Quality</div>
+      <div class="feature-desc">Opt-in camera-stream scoring: blur, exposure, frozen frames, and colorfulness (Tier 0), plus optical-flow motion, smoothness, and shot-cut detection (Tier 1). Composes with filtering.</div>
+      <div class="feature-code">
+        <span class="prompt">$ </span><span class="cmd">forge quality</span> <span class="arg">./dataset</span> <span class="flag">--video --video-level motion</span>
+      </div>
+    </div>
+
     <!-- Lint -->
     <div class="feature-card c-rose">
       <div class="feature-icon rose">
@@ -782,6 +794,18 @@
       <div class="feature-desc">Filter datasets by quality score, flags, or episode IDs. Supports dry-run previews and pre-computed quality reports.</div>
       <div class="feature-code">
         <span class="prompt">$ </span><span class="cmd">forge filter</span> <span class="arg">./dataset</span> <span class="arg">./filtered</span> <span class="flag">--min-quality 6.0</span>
+      </div>
+    </div>
+
+    <!-- Dedup -->
+    <div class="feature-card c-green">
+      <div class="feature-icon green">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      </div>
+      <div class="feature-title">Deduplication</div>
+      <div class="feature-desc">Find and remove near-duplicate episodes &mdash; exact copies, re-encodes, near-identical takes &mdash; by perceptual hashing of camera keyframes. Numpy only, no model.</div>
+      <div class="feature-code">
+        <span class="prompt">$ </span><span class="cmd">forge dedup</span> <span class="arg">./dataset</span> <span class="arg">./deduped</span>
       </div>
     </div>
 
