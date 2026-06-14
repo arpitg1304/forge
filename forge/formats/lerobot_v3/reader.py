@@ -68,6 +68,7 @@ class VideoFrameCache:
         self.max_cached = max_cached_frames
         self._container = None
         self._stream = None
+        self._decoder = None  # persistent decode generator (resumes across calls)
         self._current_frame_idx = -1
         self._frame_cache: dict[int, Any] = {}  # frame_idx -> ndarray
         self._lock = Lock()
@@ -88,12 +89,33 @@ class VideoFrameCache:
         except Exception:
             return False
 
+    def _frame_index_of(self, frame: Any) -> int:
+        """True frame index from the frame's own timestamp.
+
+        Identifying each decoded frame by its PTS (rather than counting up from
+        a guessed seek origin) makes the index→pixels mapping correct no matter
+        where a keyframe seek lands — so the same index always yields the same
+        frame, independent of access order.
+        """
+        time_base = self._stream.time_base if self._stream is not None else None
+        if frame.pts is not None and time_base is not None:
+            return int(round(float(frame.pts * time_base) * self._fps))
+        # Fallback for streams without PTS: assume contiguous decode.
+        return self._current_frame_idx + 1
+
+    def _prune(self, around: int) -> None:
+        if len(self._frame_cache) > self.max_cached:
+            to_remove = [
+                k for k in self._frame_cache if abs(k - around) > self.max_cached // 2
+            ]
+            for k in to_remove[: len(self._frame_cache) - self.max_cached]:
+                del self._frame_cache[k]
+
     def get_frame(self, frame_idx: int, dims: tuple[int, int, int] = (480, 640, 3)) -> Any:
         """Get a frame, using cache or sequential decode."""
         import numpy as np
 
         with self._lock:
-            # Check cache first
             if frame_idx in self._frame_cache:
                 return self._frame_cache[frame_idx]
 
@@ -101,47 +123,62 @@ class VideoFrameCache:
                 return np.zeros(dims, dtype=np.uint8)
 
             try:
-                # If we need to go backwards or skip far ahead, seek
-                if frame_idx < self._current_frame_idx or frame_idx > self._current_frame_idx + 30:
+                # Seek when going backwards, jumping far ahead, or starting fresh.
+                if (
+                    self._decoder is None
+                    or frame_idx < self._current_frame_idx
+                    or frame_idx > self._current_frame_idx + 30
+                ):
                     self._seek_to_frame(frame_idx)
 
-                # Decode frames until we reach target
-                for frame in self._container.decode(self._stream):
-                    self._current_frame_idx += 1
+                last_img = None
+                for frame in self._decoder:
+                    fi = self._frame_index_of(frame)
+                    self._current_frame_idx = fi
                     img = frame.to_ndarray(format="rgb24")
+                    self._frame_cache[fi] = img
+                    last_img = img
+                    self._prune(frame_idx)
 
-                    # Cache this frame
-                    self._frame_cache[self._current_frame_idx] = img
-
-                    # Prune cache if too large
-                    if len(self._frame_cache) > self.max_cached:
-                        # Remove frames far from current
-                        to_remove = [k for k in self._frame_cache
-                                   if abs(k - frame_idx) > self.max_cached // 2]
-                        for k in to_remove[:len(self._frame_cache) - self.max_cached]:
-                            del self._frame_cache[k]
-
-                    if self._current_frame_idx >= frame_idx:
+                    if fi == frame_idx:
                         return img
+                    if fi > frame_idx:
+                        # Overshot (target frame absent / PTS rounding) — return
+                        # the closest frame we have rather than a black frame.
+                        return self._frame_cache.get(frame_idx, img)
 
-                # Reached end of video
+                # Decoder exhausted before reaching the target. Return the last
+                # real frame instead of black so a short/edge read can't masquerade
+                # as a scene cut or frozen frame downstream.
+                self._decoder = None
+                if frame_idx in self._frame_cache:
+                    return self._frame_cache[frame_idx]
+                if last_img is not None:
+                    return last_img
                 return np.zeros(dims, dtype=np.uint8)
 
             except Exception:
                 return np.zeros(dims, dtype=np.uint8)
 
     def _seek_to_frame(self, target_frame: int) -> None:
-        """Seek to a frame position."""
+        """Seek to (a keyframe at or before) a frame position.
+
+        Does NOT guess the resulting index — the next decoded frame's PTS sets
+        it via _frame_index_of. A fresh decode generator is created from the new
+        position and reused across calls so sequential reads resume cheaply.
+        """
         if self._stream is None:
             return
         try:
             time_base = self._stream.time_base
             target_pts = int(target_frame / self._fps / time_base)
-            self._container.seek(target_pts, stream=self._stream, backward=True, any_frame=False)
-            # Reset current position - we'll update it as we decode
-            self._current_frame_idx = max(0, target_frame - 10)  # Estimate
+            self._container.seek(
+                target_pts, stream=self._stream, backward=True, any_frame=False
+            )
         except Exception:
             pass
+        self._decoder = self._container.decode(self._stream)
+        self._current_frame_idx = -1
 
     def close(self) -> None:
         """Close the video container."""
@@ -150,6 +187,7 @@ class VideoFrameCache:
                 self._container.close()
                 self._container = None
                 self._stream = None
+            self._decoder = None
             self._frame_cache.clear()
 
 
