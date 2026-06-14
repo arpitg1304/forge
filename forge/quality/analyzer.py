@@ -36,11 +36,24 @@ class QualityAnalyzer:
         print(report.overall_score)
     """
 
-    def __init__(self, config: QualityConfig | None = None, **kwargs) -> None:
+    def __init__(
+        self,
+        config: QualityConfig | None = None,
+        video_config=None,
+        **kwargs,
+    ) -> None:
         if config is not None:
             self.config = config
         else:
             self.config = QualityConfig(**kwargs)
+
+        # Optional Tier 0 video analysis. Left None for the proprio-only default
+        # path so importing/using quality never touches the video module.
+        self._video_analyzer = None
+        if video_config is not None:
+            from forge.quality.video import VideoQualityAnalyzer
+
+            self._video_analyzer = VideoQualityAnalyzer(config=video_config)
 
     def analyze_episode_arrays(
         self,
@@ -197,6 +210,15 @@ class QualityAnalyzer:
         states_list: list[np.ndarray] = []
         timestamps_list: list[float] = []
 
+        # Single pass: collect proprio arrays and, when enabled, feed video
+        # frames into per-camera accumulators so the episode decodes only once.
+        video_accums = (
+            self._video_analyzer.new_accumulators()
+            if self._video_analyzer is not None
+            else None
+        )
+        image_frame_idx = -1
+
         for frame in episode.frames():
             if frame.action is not None:
                 actions_list.append(np.asarray(frame.action, dtype=np.float64))
@@ -204,18 +226,28 @@ class QualityAnalyzer:
                 states_list.append(np.asarray(frame.state, dtype=np.float64))
             if frame.timestamp is not None:
                 timestamps_list.append(frame.timestamp)
+            if video_accums is not None and frame.images:
+                image_frame_idx += 1
+                self._video_analyzer.consume_frame(frame, video_accums, image_frame_idx)
 
         actions = np.stack(actions_list) if actions_list else None
         states = np.stack(states_list) if states_list else None
         timestamps = np.array(timestamps_list) if timestamps_list else None
 
-        return self.analyze_episode_arrays(
+        eq = self.analyze_episode_arrays(
             episode_id=episode.episode_id,
             actions=actions,
             states=states,
             timestamps=timestamps,
             fps=episode.fps,
         )
+
+        if video_accums is not None:
+            eq.video = self._video_analyzer.finalize(video_accums)
+            if eq.video is not None:
+                eq.flags.extend(eq.video.flags)
+
+        return eq
 
     def analyze_dataset(
         self,

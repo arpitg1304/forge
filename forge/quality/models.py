@@ -6,6 +6,10 @@ import json
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from forge.quality.video.models import VideoQuality
 
 
 @dataclass
@@ -83,6 +87,9 @@ class EpisodeQuality:
     subscores: dict[str, float] = field(default_factory=dict)
     flags: list[str] = field(default_factory=list)
 
+    # Video modality (Tier 0 pixel metrics) — populated only with --video.
+    video: "VideoQuality | None" = None
+
     @property
     def is_flagged(self) -> bool:
         return len(self.flags) > 0
@@ -107,6 +114,8 @@ class EpisodeQuality:
             d["static_fraction"] = self.static.static_fraction
         if self.timestamps is not None:
             d["jitter_ratio"] = self.timestamps.jitter_ratio
+        if self.video is not None:
+            d.update(self.video.to_flat_dict())
         return d
 
 
@@ -183,6 +192,9 @@ class QualityReport:
                 state_action_consistency=ep_data.get("state_action_consistency"),
                 flags=ep_data.get("flags", []),
             )
+            from forge.quality.video.models import VideoQuality
+
+            eq.video = VideoQuality.from_flat_dict(ep_data)
             report.per_episode.append(eq)
 
         return report

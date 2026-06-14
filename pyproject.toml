@@ -62,6 +62,7 @@ robodm = [
 ]
 video = [
     "av>=11.0.0",
+    "opencv-python>=4.8.0",
 ]
 visualize = [
     "opencv-python>=4.8.0",

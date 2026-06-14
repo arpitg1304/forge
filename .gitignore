@@ -73,6 +73,11 @@ sample_data/**/*.bag
 sample_data/**/*.mcap
 sample_data/**/*.db3
 
+# Generated synthetic dedup fixture — reproduce via
+# scripts/gen_video_dedup_samples.py; track only its README.
+sample_data/video_dedup_samples/**
+!sample_data/video_dedup_samples/README.md
+
 # Conversion outputs directory
 conversions/
 

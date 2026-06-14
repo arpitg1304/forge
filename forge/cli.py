@@ -1833,11 +1833,19 @@ def quality_cmd(
     export_flagged: Path | None = typer.Option(None, "--export-flagged", help="Export flagged episode IDs to JSON"),
     quick: bool = typer.Option(False, "--quick", "-q", help="Quick mode (sample 50 episodes)"),
     action_bounds: str | None = typer.Option(None, "--action-bounds", help="Known action bounds as 'min,max' (e.g., '-1,1')"),
+    workers: int = typer.Option(1, "--workers", "-w", help="Parallel worker processes (1 = sequential)"),
+    video: bool = typer.Option(False, "--video", help="Also analyze camera streams (Tier 0 pixel metrics)"),
+    video_level: str = typer.Option("pixel", "--video-level", help="Video tier: 'pixel' (Tier 0) or 'motion' (Tier 1: optical flow). 'semantic' coming soon."),
+    video_downscale: int = typer.Option(128, "--video-downscale", help="Longest side (px) of the analysis frame"),
+    video_stride: int = typer.Option(1, "--video-stride", help="Analyze every Nth image-bearing frame"),
+    video_max_frames: int = typer.Option(0, "--video-max-frames", help="Cap analyzed frames per camera (0 = all)"),
+    video_cameras: str | None = typer.Option(None, "--video-cameras", help="Comma-separated camera names (default: all)"),
 ) -> None:
     """Compute quality metrics on dataset episodes.
 
     Analyzes proprioception data (actions, states, timestamps) to score episode
-    quality. No video processing — pure numpy number crunching.
+    quality. Pure numpy number crunching by default — pass --video to also score
+    camera streams (Tier 0 pixel metrics: blur, exposure, frozen frames, colour).
 
     Metrics: smoothness (LDLJ), dead actions, gripper chatter, static detection,
     timestamp regularity, action saturation, action diversity.
@@ -1847,6 +1855,7 @@ def quality_cmd(
         forge quality ./dataset --gripper-dim 6 --fps 30
         forge quality ./dataset --export quality_report.json
         forge quality ./dataset --quick
+        forge quality ./dataset --video --video-stride 4
         forge quality hf://lerobot/aloha_sim_cube --sample 100
     """
     from rich.panel import Panel
@@ -1872,6 +1881,26 @@ def quality_cmd(
         action_bounds=bounds,
     )
 
+    # Video (Tier 0) config — only built when --video is passed.
+    video_config = None
+    if video:
+        if video_level not in ("pixel", "motion"):
+            console.print(
+                f"[red]Error:[/red] --video-level '{video_level}' not available. "
+                "Use 'pixel' (Tier 0) or 'motion' (Tier 1); 'semantic' is coming soon."
+            )
+            raise typer.Exit(1)
+        from forge.quality.video import VideoQualityConfig
+
+        cam_list = [c.strip() for c in video_cameras.split(",")] if video_cameras else None
+        video_config = VideoQualityConfig(
+            level=video_level,
+            downscale=video_downscale,
+            sample_stride=video_stride,
+            max_frames=video_max_frames,
+            cameras=cam_list,
+        )
+
     if quick and sample == 0:
         sample = 50
 
@@ -1895,7 +1924,6 @@ def quality_cmd(
     console.print()
 
     # Analyze with progress bar
-    analyzer = QualityAnalyzer(config=config)
     from collections import defaultdict
 
     from forge.quality.models import QualityReport
@@ -1903,29 +1931,72 @@ def quality_cmd(
     report = QualityReport(dataset_path=str(path))
     flagged: dict[str, list[str]] = defaultdict(list)
 
+    def _record(eq) -> None:
+        report.per_episode.append(eq)
+        for flag in eq.flags:
+            flagged[flag].append(eq.episode_id)
+
+    # Determine the episode count for parallel chunking (only when needed).
+    parallel_total = 0
+    if workers > 1:
+        if sample > 0:
+            parallel_total = sample
+        else:
+            try:
+                parallel_total = reader.inspect(resolved_path).num_episodes or 0
+            except ForgeError:
+                parallel_total = 0
+        if parallel_total <= 1:
+            workers = 1  # nothing to parallelize
+
     try:
-        with Progress(
-            TextColumn("[bold green]{task.description}"),
-            BarColumn(),
-            MofNCompleteColumn(),
-            console=console,
-        ) as progress:
-            task = progress.add_task("Analyzing episodes...", total=sample or None)
+        if workers > 1:
+            from forge.quality.parallel import analyze_parallel
 
-            for i, episode in enumerate(reader.read_episodes(resolved_path)):
-                if sample > 0 and i >= sample:
-                    break
+            with Progress(
+                TextColumn("[bold green]{task.description}"),
+                BarColumn(),
+                MofNCompleteColumn(),
+                console=console,
+            ) as progress:
+                task = progress.add_task(
+                    f"Analyzing episodes ({workers} workers)...", total=parallel_total
+                )
 
-                eq = analyzer.analyze_episode(episode)
-                report.per_episode.append(eq)
+                def on_progress(done: int, total: int) -> None:
+                    progress.update(task, completed=done, total=total)
 
-                for flag in eq.flags:
-                    flagged[flag].append(eq.episode_id)
+                episodes, errors = analyze_parallel(
+                    resolved_path,
+                    format_name,
+                    parallel_total,
+                    config,
+                    video_config,
+                    num_workers=workers,
+                    progress_callback=on_progress,
+                )
+            for eq in episodes:
+                _record(eq)
+            for err in errors[:5]:
+                console.print(f"[yellow]Skipped episode:[/yellow] {err}")
+        else:
+            analyzer = QualityAnalyzer(config=config, video_config=video_config)
+            with Progress(
+                TextColumn("[bold green]{task.description}"),
+                BarColumn(),
+                MofNCompleteColumn(),
+                console=console,
+            ) as progress:
+                task = progress.add_task("Analyzing episodes...", total=sample or None)
 
-                progress.advance(task)
+                for i, episode in enumerate(reader.read_episodes(resolved_path)):
+                    if sample > 0 and i >= sample:
+                        break
+                    _record(analyzer.analyze_episode(episode))
+                    progress.advance(task)
 
-            if sample == 0:
-                progress.update(task, total=len(report.per_episode), completed=len(report.per_episode))
+                if sample == 0:
+                    progress.update(task, total=len(report.per_episode), completed=len(report.per_episode))
 
     except ForgeError as e:
         console.print(f"[red]Error reading dataset:[/red] {e}")
@@ -2044,6 +2115,59 @@ def quality_cmd(
                 f"[dim](range {np.min(sa_vals):.2f}\u2013{np.max(sa_vals):.2f})[/dim]"
             )
 
+    # Video (Tier 0) summary
+    vid_eps = [eq for eq in report.per_episode if eq.video is not None]
+    if vid_eps:
+        cams: set[str] = set()
+        for eq in vid_eps:
+            cams.update(eq.video.per_camera.keys())
+
+        def _vid_mean(attr: str) -> float | None:
+            vals = [
+                getattr(eq.video, attr)
+                for eq in vid_eps
+                if getattr(eq.video, attr) is not None
+            ]
+            return float(np.mean(vals)) if vals else None
+
+        has_motion = any(eq.video.mean_motion is not None for eq in vid_eps)
+        tier_label = "Tier 0+1 — pixel + motion" if has_motion else "Tier 0 — pixel"
+        lines.append("")
+        lines.append(
+            f"[bold]Video[/bold] [dim]({tier_label}, {len(vid_eps)} episodes, "
+            f"{len(cams)} camera{'s' if len(cams) != 1 else ''})[/dim]"
+        )
+
+        def _vid_line(label: str, value: float | None, flag_key: str, fmt: str) -> None:
+            if value is None:
+                return
+            n_flag = len(report.flagged_episodes.get(flag_key, []))
+            flag_str = f"  [yellow]{n_flag} flagged[/yellow]" if n_flag else "  OK"
+            lines.append(f"  {label:<26} {format(value, fmt)}{flag_str}")
+
+        _vid_line("Sharpness (min, mean)", _vid_mean("min_sharpness"), "blurry", ".0f")
+        _vid_line("Overexposed fraction", _vid_mean("overexposed_fraction"), "over_exposed", ".2f")
+        _vid_line("Underexposed fraction", _vid_mean("underexposed_fraction"), "under_exposed", ".2f")
+        _vid_line("Frozen-frame fraction", _vid_mean("frozen_fraction"), "frozen_frames", ".2f")
+        color = _vid_mean("mean_colorfulness")
+        if color is not None:
+            lines.append(f"  {'Colorfulness':<26} {color:.1f}  [dim](scene diversity)[/dim]")
+
+        # Tier 1 motion (only present with --video-level motion)
+        motion = _vid_mean("mean_motion")
+        if motion is not None:
+            _vid_line("Motion (px/frame)", motion, "no_motion", ".2f")
+            _vid_line("Motion smoothness (LDLJ)", _vid_mean("motion_smoothness"), "shaky", ".1f")
+            scene = _vid_mean("scene_motion_fraction")
+            if scene is not None:
+                lines.append(
+                    f"  {'Scene-motion fraction':<26} {scene:.2f}  "
+                    f"[dim](object vs camera motion)[/dim]"
+                )
+            n_cut = len(report.flagged_episodes.get("cut_detected", []))
+            if n_cut:
+                lines.append(f"  {'Cuts detected':<26} [yellow]{n_cut} episodes[/yellow]")
+
     # Top issues
     if report.flags:
         lines.append("")
@@ -2084,12 +2208,18 @@ def filter_cmd(
     output: Path | None = typer.Argument(None, help="Output path for filtered dataset (omit for dry-run)"),
     min_quality: float | None = typer.Option(None, "--min-quality", "-q", help="Keep episodes with overall_score >= this value (0-10)"),
     exclude_flags: str | None = typer.Option(None, "--exclude-flags", help="Exclude episodes with ANY of these flags (comma-separated)"),
+    min_sharpness: float | None = typer.Option(None, "--min-sharpness", help="[video] Exclude episodes whose min camera sharpness is below this (var-of-Laplacian)"),
+    max_frozen: float | None = typer.Option(None, "--max-frozen", help="[video] Exclude episodes whose frozen-frame fraction exceeds this (0-1)"),
+    max_overexposed: float | None = typer.Option(None, "--max-overexposed", help="[video] Exclude episodes whose overexposed fraction exceeds this (0-1)"),
+    max_underexposed: float | None = typer.Option(None, "--max-underexposed", help="[video] Exclude episodes whose underexposed fraction exceeds this (0-1)"),
+    min_motion: float | None = typer.Option(None, "--min-motion", help="[video, Tier 1] Exclude episodes whose mean optical-flow motion is below this (px/frame)"),
     include_episodes: str | None = typer.Option(None, "--include-episodes", help="Only include these episode IDs (comma-separated)"),
     exclude_episodes: str | None = typer.Option(None, "--exclude-episodes", help="Exclude these episode IDs (comma-separated)"),
     from_report: Path | None = typer.Option(None, "--from-report", "-r", help="Use pre-computed quality report JSON"),
     gripper_dim: int = typer.Option(-1, "--gripper-dim", "-g", help="Gripper dimension index (-1 = last)"),
     fps: float = typer.Option(30.0, "--fps", "-f", help="Fallback FPS if timestamps unavailable"),
     action_bounds: str | None = typer.Option(None, "--action-bounds", help="Known action bounds as 'min,max'"),
+    video_stride: int = typer.Option(1, "--video-stride", help="[video] Analyze every Nth image-bearing frame during live analysis"),
 ) -> None:
     """Filter dataset episodes based on quality scores and flags.
 
@@ -2097,10 +2227,16 @@ def filter_cmd(
     writes only passing episodes to the output (same format). If no output
     path is given, runs in dry-run mode and prints a summary.
 
+    Video (Tier 0) criteria — --min-sharpness, --max-frozen, --max-overexposed,
+    --max-underexposed, and the video flags (blurry, frozen_frames, over_exposed,
+    under_exposed) via --exclude-flags — trigger live video analysis automatically,
+    or read video fields straight from a --from-report JSON.
+
     Examples:
         forge filter ./dataset                                    # Dry-run
         forge filter ./dataset ./filtered --min-quality 6.0
         forge filter ./dataset ./filtered --exclude-flags jerky,mostly_static
+        forge filter ./dataset ./filtered --min-sharpness 80 --exclude-flags frozen_frames
         forge filter ./dataset ./filtered --from-report report.json --min-quality 7.0
     """
     from rich.panel import Panel
@@ -2132,12 +2268,18 @@ def filter_cmd(
     config = FilterConfig(
         min_quality=min_quality,
         exclude_flags=flags_list,
+        min_sharpness=min_sharpness,
+        max_frozen_fraction=max_frozen,
+        max_overexposed_fraction=max_overexposed,
+        max_underexposed_fraction=max_underexposed,
+        min_motion=min_motion,
         include_episodes=include_list,
         exclude_episodes=exclude_list,
         from_report=from_report,
         gripper_dim=gripper_dim,
         fps=fps,
         action_bounds=bounds,
+        video_stride=video_stride,
     )
 
     # Resolve source
@@ -2159,6 +2301,16 @@ def filter_cmd(
         criteria.append(f"min_quality={min_quality}")
     if flags_list:
         criteria.append(f"exclude_flags=[{', '.join(flags_list)}]")
+    if min_sharpness is not None:
+        criteria.append(f"min_sharpness={min_sharpness:g}")
+    if max_frozen is not None:
+        criteria.append(f"max_frozen={max_frozen:g}")
+    if max_overexposed is not None:
+        criteria.append(f"max_overexposed={max_overexposed:g}")
+    if max_underexposed is not None:
+        criteria.append(f"max_underexposed={max_underexposed:g}")
+    if min_motion is not None:
+        criteria.append(f"min_motion={min_motion:g}")
     if include_list:
         criteria.append(f"include={len(include_list)} episodes")
     if exclude_list:
@@ -2257,6 +2409,154 @@ def filter_cmd(
             + (f" --min-quality {min_quality}" if min_quality else "")
             + (f" --exclude-flags {exclude_flags}" if exclude_flags else "")
             + (f" --from-report {from_report}" if from_report else "")
+        )
+
+
+@app.command("dedup")
+def dedup_cmd(
+    source: str = typer.Argument(..., help="Path to dataset (local or hf://org/repo)"),
+    output: Path | None = typer.Argument(None, help="Output path for deduplicated dataset (omit for dry-run)"),
+    method: str = typer.Option("phash", "--method", "-m", help="Perceptual hash: phash (robust), dhash (fast), ahash (cheapest). 'clip' coming in Tier 2."),
+    threshold: float = typer.Option(0.10, "--threshold", "-t", help="Max normalized Hamming distance to call two episodes duplicates (0 = exact)"),
+    keyframes: int = typer.Option(16, "--keyframes", help="Frames sampled per episode per camera for the signature"),
+    hash_size: int = typer.Option(8, "--hash-size", help="Hash side length; hash is hash_size^2 bits"),
+    cameras: str | None = typer.Option(None, "--cameras", help="Comma-separated camera names (default: all)"),
+) -> None:
+    """Find and remove near-duplicate episodes by perceptual hashing.
+
+    Hashes K uniformly-spaced keyframes per camera, clusters episodes whose
+    worst-case per-camera Hamming distance is within --threshold, and keeps one
+    representative per cluster. Dry-run by default; pass an output path to write
+    the deduplicated dataset in the same format.
+
+    Tier 0: numpy only, CPU, no model.
+
+    Examples:
+        forge dedup ./dataset                                  # Dry-run
+        forge dedup ./dataset ./deduped --threshold 0.05
+        forge dedup ./dataset ./deduped --method dhash --keyframes 8
+    """
+    from rich.panel import Panel
+    from rich.progress import BarColumn, MofNCompleteColumn, Progress, TextColumn
+    from rich.table import Table
+
+    from forge.core.exceptions import ForgeError
+    from forge.dedup import DedupConfig, DedupEngine
+
+    if method == "clip":
+        console.print(
+            "[red]Error:[/red] --method 'clip' (semantic dedup) is not available yet. "
+            "Use phash / dhash / ahash; CLIP-based dedup arrives with Tier 2."
+        )
+        raise typer.Exit(1)
+    if method not in ("phash", "dhash", "ahash"):
+        console.print(f"[red]Error:[/red] Unknown --method '{method}'. Choose phash, dhash, or ahash.")
+        raise typer.Exit(1)
+
+    cam_list = [c.strip() for c in cameras.split(",")] if cameras else None
+    config = DedupConfig(
+        method=method,
+        threshold=threshold,
+        keyframes=keyframes,
+        hash_size=hash_size,
+        cameras=cam_list,
+    )
+
+    resolved_path = _resolve_dataset_path(source)
+    if not resolved_path.exists():
+        console.print(f"[red]Error:[/red] Dataset not found: {resolved_path}")
+        raise typer.Exit(1)
+
+    dry_run = output is None
+    if dry_run:
+        console.print(f"[cyan]Dedup dry-run:[/cyan] {source}")
+    else:
+        console.print(f"[cyan]Deduplicating:[/cyan] {source} [dim]→[/dim] {output}")
+    console.print(f"[dim]method={method}  threshold={threshold:g}  keyframes={keyframes}  hash_size={hash_size}[/dim]")
+    console.print()
+
+    engine = DedupEngine(config)
+    try:
+        with Progress(
+            TextColumn("[bold green]{task.description}"),
+            BarColumn(),
+            MofNCompleteColumn(),
+            console=console,
+        ) as progress:
+            sig_task = progress.add_task("Hashing episodes...", total=None)
+            cmp_task = progress.add_task("Comparing episodes...", total=None)
+
+            def on_progress(stage: str, current: int, total: int) -> None:
+                if stage == "signature":
+                    progress.update(sig_task, completed=current + 1)
+                elif stage == "compare" and total > 0:
+                    progress.update(cmp_task, total=total, completed=current)
+
+            result = engine.analyze(resolved_path, progress_callback=on_progress)
+    except ForgeError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1)
+
+    console.print()
+
+    # Show duplicate clusters
+    if result.clusters:
+        table = Table(show_header=True, header_style="bold", title="Duplicate clusters")
+        table.add_column("Keep (representative)", style="green")
+        table.add_column("Drop (near-duplicates)", style="red")
+        table.add_column("Distance", justify="right")
+        for cluster in result.clusters[:50]:
+            dups = ", ".join(d for d, _ in cluster.duplicates)
+            dists = ", ".join(f"{dist:.3f}" for _, dist in cluster.duplicates)
+            table.add_row(cluster.representative, dups, dists)
+        console.print(table)
+        if len(result.clusters) > 50:
+            console.print(f"[dim]... and {len(result.clusters) - 50} more clusters[/dim]")
+        console.print()
+
+    # Write if requested — delegate to the filter engine (one writer path).
+    output_written = False
+    if not dry_run and result.dropped_ids:
+        from forge.filter.engine import FilterConfig, FilterEngine
+
+        fengine = FilterEngine(FilterConfig(exclude_episodes=result.dropped_ids))
+        try:
+            fresult = fengine.filter(source=resolved_path, output=output)
+            output_written = fresult.success
+            if fresult.errors:
+                for err in fresult.errors[:5]:
+                    console.print(f"[red]Write error:[/red] {err}")
+        except ForgeError as e:
+            console.print(f"[red]Error writing output:[/red] {e}")
+            raise typer.Exit(1)
+    elif not dry_run:
+        console.print("[yellow]No duplicates found — nothing to write.[/yellow]")
+
+    # Summary
+    lines: list[str] = []
+    lines.append(f"Total episodes: {result.total_episodes}")
+    lines.append(f"Unique (kept): [green]{result.num_unique}[/green]")
+    lines.append(f"Near-duplicates (dropped): [red]{result.num_duplicates}[/red]  in {len(result.clusters)} clusters")
+    if result.num_uncomparable:
+        lines.append(f"[dim]No camera frames (kept as-is): {result.num_uncomparable}[/dim]")
+    if output_written:
+        lines.append(f"Output: [bold]{output}[/bold]")
+    for err in result.errors[:5]:
+        lines.append(f"[red]Error:[/red] {err}")
+
+    console.print(
+        Panel(
+            "\n".join(lines),
+            title=f"Dedup {'Preview' if dry_run else 'Result'}",
+            border_style="blue",
+            padding=(1, 2),
+        )
+    )
+
+    if dry_run and result.num_duplicates > 0:
+        console.print(
+            f"\n[dim]Run with output path to write deduplicated dataset:[/dim]"
+            f"\n  forge dedup {source} ./deduped --method {method} --threshold {threshold:g}"
         )
 
 
