@@ -116,8 +116,10 @@ forge convert hf://lerobot/pusht ./output --format lerobot-v3
 | HDF5 from ALOHA / robomimic | MCAP for Foxglove playback | `forge convert aloha.hdf5 ./out --format mcap` |
 | Zarr from Diffusion Policy | LeRobot v3 | `forge convert pusht.zarr ./out --format lerobot-v3` |
 | Any supported format | Quality scores per episode | `forge quality ./dataset` |
+| Any supported format | Video quality (blur, motion, cuts) | `forge quality ./dataset --video --video-level motion` |
 | Any supported format | Lint for hygiene defects | `forge lint ./dataset` |
 | Any supported format | Filter out bad demos | `forge filter ./dataset ./clean --min-quality 6.0` |
+| Any supported format | Remove near-duplicate episodes | `forge dedup ./dataset ./deduped` |
 | Continuous actions | Discrete action tokens for VLA training | `forge tokenize write ./dataset ./tokenized --strategy openvla-bins` |
 
 ## Python API
@@ -159,6 +161,18 @@ Scores each episode 0-10 based on 8 research-backed metrics:
 
 See [forge/quality/README.md](forge/quality/README.md) for full metric details, paper references, and how to add new metrics.
 
+### Video quality (opt-in)
+
+Proprio scoring is the default fast lane; pass `--video` to also score the camera streams. **Tier 0** (`pixel`) adds sharpness/blur, exposure, frozen-frame, and colorfulness; **Tier 1** (`motion`) adds optical-flow motion magnitude, smoothness, camera-vs-scene split, and shot-cut detection. Add `--workers N` to parallelize.
+
+```bash
+forge quality ./my_dataset --video                       # Tier 0 (pixel)
+forge quality ./my_dataset --video --video-level motion  # Tier 1 (optical flow)
+forge filter ./my_dataset ./clean --min-sharpness 80 --min-motion 0.1 --exclude-flags cut_detected
+```
+
+Requires the `[video]` extra (`pip install forge-robotics[video]`). See [forge/quality/video/README.md](forge/quality/video/README.md).
+
 ## Episode Filtering
 
 Filter datasets by quality score, flags, or episode IDs. Supports dry-run previews and pre-computed quality reports.
@@ -185,6 +199,18 @@ forge lint ./my_dataset --strict                                     # fail on w
 Runs against the reader's inspected metadata — no video decode, no full episode scan. Exits non-zero on any error (or any warning under `--strict`), so it drops straight into CI.
 
 See [forge/lint/README.md](forge/lint/README.md) for the full check list and thresholds.
+
+## Deduplication
+
+Find and remove near-duplicate episodes (exact copies, re-encodes, near-identical takes) by perceptual hashing of per-camera keyframes — numpy only, no model.
+
+```bash
+forge dedup ./my_dataset                                 # Dry-run: report duplicate clusters
+forge dedup ./my_dataset ./deduped --threshold 0.05      # Write deduplicated dataset
+forge dedup ./my_dataset ./deduped --method dhash        # phash (default) | dhash | ahash
+```
+
+See [forge/dedup/README.md](forge/dedup/README.md) for the algorithm and tuning.
 
 ## Dataset Registry
 
