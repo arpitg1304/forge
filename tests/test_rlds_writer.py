@@ -182,3 +182,57 @@ class TestRLDSWriter:
         keys = list(example.features.feature.keys())
         assert "steps/action" in keys
         assert "episode_metadata/file_path" in keys
+
+    @pytest.mark.skipif(not _check_tensorflow_available(), reason="TensorFlow not installed")
+    def test_episode_metadata_carried_into_rlds(self, tmp_path: Path):
+        """Source episode metadata survives conversion via episode_metadata/metadata_json."""
+        import tensorflow as tf
+
+        from forge.formats.rlds.writer import RLDSWriter, RLDSWriterConfig
+
+        meta = {"operator": "alice", "site": "lab-3", "trial": 7}
+        episode = _create_mock_episode("ep_meta", num_frames=4)
+        episode.metadata = meta
+
+        writer = RLDSWriter(RLDSWriterConfig(dataset_name="test_meta"))
+        writer.write_episode(episode, tmp_path, episode_index=0)
+        writer.finalize(
+            tmp_path,
+            DatasetInfo(path=tmp_path, format="rlds", num_episodes=1, total_frames=4),
+        )
+
+        # features.json declares the new episode-metadata field
+        with open(tmp_path / "features.json") as f:
+            features = json.load(f)
+        ep_meta_features = features["featuresDict"]["features"]["episode_metadata"]["featuresDict"]["features"]
+        assert "metadata_json" in ep_meta_features
+
+        # the value round-trips through the TFRecord
+        tfrecord_files = list(tmp_path.glob("*.tfrecord*"))
+        ds = tf.data.TFRecordDataset([str(f) for f in tfrecord_files])
+        example = tf.train.Example()
+        example.ParseFromString(list(ds)[0].numpy())
+        raw = example.features.feature["episode_metadata/metadata_json"].bytes_list.value[0]
+        assert json.loads(raw.decode("utf-8")) == meta
+
+    @pytest.mark.skipif(not _check_tensorflow_available(), reason="TensorFlow not installed")
+    def test_episode_without_metadata_writes_empty_json(self, tmp_path: Path):
+        """An episode with no metadata still produces a uniform, valid '{}' field."""
+        import tensorflow as tf
+
+        from forge.formats.rlds.writer import RLDSWriter, RLDSWriterConfig
+
+        episode = _create_mock_episode("ep_plain", num_frames=3)  # metadata defaults to {}
+        writer = RLDSWriter(RLDSWriterConfig(dataset_name="test_plain"))
+        writer.write_episode(episode, tmp_path, episode_index=0)
+        writer.finalize(
+            tmp_path,
+            DatasetInfo(path=tmp_path, format="rlds", num_episodes=1, total_frames=3),
+        )
+
+        tfrecord_files = list(tmp_path.glob("*.tfrecord*"))
+        ds = tf.data.TFRecordDataset([str(f) for f in tfrecord_files])
+        example = tf.train.Example()
+        example.ParseFromString(list(ds)[0].numpy())
+        raw = example.features.feature["episode_metadata/metadata_json"].bytes_list.value[0]
+        assert json.loads(raw.decode("utf-8")) == {}

@@ -316,6 +316,15 @@ class RLDSWriter:
         feature_dict["episode_metadata/file_path"] = tf.train.Feature(
             bytes_list=tf.train.BytesList(value=[episode.episode_id.encode("utf-8")])
         )
+        # Carry the source episode's metadata into RLDS episode_metadata. RLDS
+        # supports per-episode metadata first-class; without this it is dropped on
+        # conversion. Stored as a JSON string so arbitrary keys fit one fixed
+        # feature ("{}" when there is none, keeping the schema uniform).
+        feature_dict["episode_metadata/metadata_json"] = tf.train.Feature(
+            bytes_list=tf.train.BytesList(
+                value=[json.dumps(episode.metadata or {}, default=str).encode("utf-8")]
+            )
+        )
 
         return tf.train.Example(features=tf.train.Features(feature=feature_dict))
 
@@ -680,7 +689,12 @@ class RLDSWriter:
                                     "pythonClassName": "tensorflow_datasets.core.features.text_feature.Text",
                                     "text": {},
                                     "description": "Original episode identifier.",
-                                }
+                                },
+                                "metadata_json": {
+                                    "pythonClassName": "tensorflow_datasets.core.features.text_feature.Text",
+                                    "text": {},
+                                    "description": "Source episode metadata, JSON-encoded ('{}' if none).",
+                                },
                             }
                         },
                     },
