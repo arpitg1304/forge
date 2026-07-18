@@ -51,6 +51,28 @@ def _looks_like_hf_repo_id(path_str: str) -> bool:
     return True
 
 
+def _reject_cloud_output(output: "Path | str | None") -> None:
+    """Fail fast if an output destination is a cloud URI.
+
+    Forge's format writers use local filesystem operations, so writing outputs
+    directly to object stores isn't supported yet. Note that typer parses
+    ``output`` as a ``Path``, which collapses ``s3://bucket`` to ``s3:/bucket``
+    — we match both forms.
+    """
+    if output is None:
+        return
+    s = str(output)
+    cloud_prefixes = ("s3:/", "gs:/", "gcs:/")
+    if s.startswith(cloud_prefixes):
+        from forge.io.paths import RemoteWriteNotSupportedError
+
+        # Restore the // that typer's Path parsing collapsed, for a clean message.
+        if "://" not in s:
+            s = s.replace(":/", "://", 1)
+        console.print(f"[red]Error:[/red] {RemoteWriteNotSupportedError(s)}")
+        raise typer.Exit(1)
+
+
 def _resolve_via_hub(repo_id_or_url: str) -> Path:
     """Resolve a HuggingFace dataset reference to a local path.
 
@@ -114,9 +136,18 @@ def _resolve_dataset_path(path_str: str, demo: bool = False) -> Path:
         Resolved local path.
     """
     from forge.hub import is_hf_url
+    from forge.io import is_remote_uri, localize
 
     if is_hf_url(path_str):
         return _resolve_via_hub(path_str)
+
+    # Cloud object-store URIs (s3://, gs://) — download to a temp dir and hand
+    # back the local path so every downstream reader works unchanged.
+    if is_remote_uri(path_str):
+        console.print(f"[cyan]Fetching from cloud storage:[/cyan] {path_str}")
+        local_path = localize(path_str, console=console)
+        console.print(f"[green]Downloaded to:[/green] {local_path}")
+        return local_path
 
     # Check filesystem first
     path = Path(path_str)
@@ -707,6 +738,10 @@ def convert_cmd(
     from forge.convert import ConversionConfig, Converter
     from forge.core.exceptions import ForgeError
     from forge.formats.registry import FormatRegistry
+
+    # Writing outputs to cloud URIs isn't supported yet — fail fast before any
+    # (potentially expensive) source download.
+    _reject_cloud_output(output)
 
     # Resolve HuggingFace URLs to local paths
     try:
@@ -1336,6 +1371,7 @@ def export_video_cmd(
     from forge.formats.registry import FormatRegistry
     from forge.video.encoder import VideoEncoder, VideoEncoderConfig
 
+    _reject_cloud_output(output)
     # Resolve path (handles hf:// URLs)
     resolved_path = _resolve_dataset_path(path)
 
@@ -2283,6 +2319,7 @@ def filter_cmd(
     )
 
     # Resolve source
+    _reject_cloud_output(output)
     resolved_path = _resolve_dataset_path(source)
     if not resolved_path.exists():
         console.print(f"[red]Error:[/red] Dataset not found: {resolved_path}")
@@ -2462,6 +2499,7 @@ def dedup_cmd(
         cameras=cam_list,
     )
 
+    _reject_cloud_output(output)
     resolved_path = _resolve_dataset_path(source)
     if not resolved_path.exists():
         console.print(f"[red]Error:[/red] Dataset not found: {resolved_path}")
@@ -3324,6 +3362,7 @@ def tokenize_write_cmd(
     from forge.core.exceptions import ForgeError
     from forge.tokenize.writer import tokenize_and_write
 
+    _reject_cloud_output(output)
     resolved = _resolve_dataset_path(source)
     if not resolved.exists():
         console.print(f"[red]Error:[/red] Dataset not found: {resolved}")
