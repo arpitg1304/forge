@@ -61,6 +61,8 @@ Add a reader, get all writers for free. Add a writer, get all readers for free. 
 pip install forge-robotics                  # base CLI + LeRobot v3 read/write
 pip install "forge-robotics[mcap]"          # add MCAP read/write
 pip install "forge-robotics[rlds,lerobot]"  # pick the formats you need
+pip install "forge-robotics[s3]"            # read from Amazon S3 (s3://)
+pip install "forge-robotics[gcs]"           # read from Google Cloud Storage (gs://)
 pip install "forge-robotics[all]"           # everything
 ```
 
@@ -106,6 +108,42 @@ Works with HuggingFace Hub too:
 forge inspect hf://lerobot/pusht
 forge convert hf://lerobot/pusht ./output --format lerobot-v3
 ```
+
+### Cloud storage (S3 & GCS)
+
+Every command that takes a dataset path also accepts `s3://` and `gs://` URIs,
+in addition to local paths and `hf://` URLs:
+
+```bash
+pip install "forge-robotics[s3]"     # or [gcs] for Google Cloud Storage
+
+forge inspect s3://my-bucket/datasets/run_0413
+forge convert gs://lab-data/rosbags ./out --format lerobot-v3
+forge quality s3://my-bucket/datasets/droid --report report.html
+```
+
+Cloud datasets are downloaded to a temporary directory on first access and
+cleaned up automatically when the command finishes. This keeps every format
+(including video, HDF5, and rosbag, which need random file access) working
+exactly as it does locally.
+
+**Authentication** uses each provider's standard credential chain — Forge never
+handles credentials itself:
+
+- **S3** — `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` env vars, `~/.aws/config`
+  profiles (`AWS_PROFILE`), or the instance/EKS IAM role. See the
+  [AWS credentials docs](https://boto3.amazonaws.com/v1/documentation/api/latest/guide/credentials.html).
+- **GCS** — Application Default Credentials: `gcloud auth application-default login`,
+  a service-account key via `GOOGLE_APPLICATION_CREDENTIALS`, or the attached
+  service account on GCP. See the
+  [GCP ADC docs](https://cloud.google.com/docs/authentication/application-default-credentials).
+
+> **Writing** outputs directly to `s3://` / `gs://` is not supported yet — write
+> to a local directory and upload it afterwards (`aws s3 cp --recursive`,
+> `gcloud storage cp --recursive`).
+
+See [forge/io/README.md](forge/io/README.md) for the Python API and a guide to
+diagnosing cloud bucket connectivity issues.
 
 ## Common conversions
 

@@ -268,13 +268,18 @@ class QualityAnalyzer:
             QualityReport with per-episode and aggregate results.
         """
         from forge.formats.registry import FormatRegistry
+        from forge.io import is_remote_uri, localize
 
-        resolved = Path(path)
-        if not resolved.exists():
-            # Try HF resolution
-            from forge.hub.download import download_dataset
+        if is_remote_uri(path):
+            # Cloud URI (s3://, gs://) — download to a temp dir.
+            resolved = localize(str(path))
+        else:
+            resolved = Path(path)
+            if not resolved.exists():
+                # Try HF resolution
+                from forge.hub.download import download_dataset
 
-            resolved = download_dataset(str(path))
+                resolved = download_dataset(str(path))
 
         if format is None:
             format = FormatRegistry.detect_format(resolved)
