@@ -9,6 +9,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **The catalog (Phase 1) — an append-only, queryable registry of episodes.**
+  Turns Forge from a per-dataset tool into a system of record: a set of
+  append-only Parquet tables (`episodes`, `quality_scores`) written with pyarrow
+  and queried with embedded DuckDB, on a local directory or an `s3://` / `gs://`
+  bucket.
+
+  ```bash
+  pip install "forge-robotics[catalog]"
+  forge catalog init ./forge-catalog
+  forge ingest ./my_dataset --catalog ./forge-catalog
+  forge query "SELECT task, count(*) FROM episodes GROUP BY task" -c ./forge-catalog
+  forge catalog stats --catalog ./forge-catalog
+  ```
+
+  - New module `forge/catalog/` with a `Catalog` class as the single entry
+    point (`from forge.catalog import Catalog`), plus `forge/catalog/ingest.py`.
+  - New CLI commands: `forge catalog init`, `forge catalog stats`,
+    `forge ingest`, `forge query` (SQL over `episodes`, `quality_scores`, and a
+    `v_latest_quality` view; `--format table|json|csv`).
+  - **Ingestion reuses existing internals** — the same format readers behind
+    `forge inspect` for metadata and `QualityAnalyzer.analyze_episode` (the
+    engine behind `forge quality`) for scoring. No metadata extraction or
+    scoring logic was reimplemented, and no existing behavior changed.
+  - **Idempotent & crash-safe.** Episodes are keyed by a content hash, so
+    re-running an ingest over the same sources is a no-op. Each flush commits
+    atomically via a manifest-last protocol; queries read only manifested
+    part-files, so a crash never exposes a partial batch.
+  - New deps behind the `[catalog]` extra: `duckdb`, `xxhash` (and an explicit
+    `pyarrow`). The base CLI never imports them — they load only when a catalog
+    command runs.
+  - See [forge/catalog/README.md](forge/catalog/README.md) and
+    [docs/forge_data_engine_design.md](docs/forge_data_engine_design.md).
+
 - **Cloud storage support (`s3://`, `gs://`).** Every command that accepts a
   dataset path now also accepts Amazon S3 and Google Cloud Storage URIs, in
   addition to local paths and `hf://` URLs. For example:
