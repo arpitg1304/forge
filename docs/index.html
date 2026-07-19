@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Forge - Robotics Data Toolkit</title>
-<meta name="description" content="Convert, inspect, visualize, score, and discover robotics datasets across every major format.">
+<title>Forge - Robotics Data Toolkit &amp; Data Engine</title>
+<meta name="description" content="Convert between every major robotics dataset format — then register, query, search, dedup, and curate your whole corpus with the Forge catalog.">
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
@@ -252,6 +252,31 @@
     border: none;
     border-top: 1px solid var(--border);
   }
+
+  /* --- Data engine flow --- */
+  .engine-flow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    margin: 0 auto 2.25rem;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .ef-step {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 0.4rem 0.85rem;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+  }
+  .ef-step.ef-studio {
+    color: var(--accent-bright);
+    border-color: var(--border-hover);
+    background: var(--accent-glow);
+  }
+  .ef-arrow { color: var(--text-muted); font-size: 0.9rem; }
 
   /* --- Feature Cards --- */
   .features-grid {
@@ -668,7 +693,8 @@
 <nav class="nav" id="nav">
   <a href="#" class="nav-logo">&gt; forge</a>
   <div class="nav-links">
-    <a href="#features" class="hide-mobile">Features</a>
+    <a href="#features" class="hide-mobile">Toolkit</a>
+    <a href="#engine" class="hide-mobile">Data Engine</a>
     <a href="#demo" class="hide-mobile">Demos</a>
     <a href="#formats" class="hide-mobile">Formats</a>
     <a href="#registry" class="hide-mobile">Registry</a>
@@ -684,7 +710,7 @@
 <section class="hero">
   <div class="hero-logo">FORGE</div>
   <p class="hero-tagline">
-    The normalization layer for robotics data. Convert, inspect, score, tokenize, visualize, and discover datasets across every major format.
+    The normalization layer for robotics data &mdash; and the data engine on top of it. Convert across every major format, then register, search, dedup, and curate your whole corpus.
   </p>
   <div class="hero-diagram">
     <span class="fmt">RLDS</span> &nbsp;<span class="arrow">===</span><span class="gear">\</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="gear">/</span><span class="arrow">===</span>&gt; <span class="fmt">LeRobot</span><br>
@@ -719,9 +745,9 @@
 <!-- Features -->
 <section id="features">
   <div class="section-header">
-    <div class="section-label">Features</div>
-    <h2 class="section-title">Everything you need for robotics data</h2>
-    <p class="section-subtitle">One toolkit to convert, inspect, score, filter, segment, tokenize, and browse robotics datasets.</p>
+    <div class="section-label">The Toolkit</div>
+    <h2 class="section-title">Everything you need for a single dataset</h2>
+    <p class="section-subtitle">Convert, inspect, score, lint, filter, dedup, segment, tokenize, and visualize &mdash; one dataset at a time, across every format.</p>
   </div>
 
   <div class="features-grid">
@@ -854,6 +880,95 @@
       <div class="feature-desc">Curated catalog of 23+ prominent robotics datasets. Search, filter, and download by name. Use dataset IDs directly in any command.</div>
       <div class="feature-code">
         <span class="prompt">$ </span><span class="cmd">forge inspect</span> <span class="arg">droid</span> <span class="comment"># resolves via registry</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- The Data Engine -->
+<section id="engine">
+  <div class="section-header">
+    <div class="section-label">The Data Engine</div>
+    <h2 class="section-title">From a pile of datasets to a queryable corpus</h2>
+    <p class="section-subtitle">The catalog registers every episode you collect into an append-only, SQL-queryable store &mdash; then embed, search, dedup, curate, and explore it. Zero-server, cloud-native.</p>
+  </div>
+
+  <div class="engine-flow">
+    <span class="ef-step">ingest</span><span class="ef-arrow">&rarr;</span><span class="ef-step">query</span><span class="ef-arrow">&rarr;</span><span class="ef-step">embed</span><span class="ef-arrow">&rarr;</span><span class="ef-step">search</span><span class="ef-arrow">&rarr;</span><span class="ef-step">dedup</span><span class="ef-arrow">&rarr;</span><span class="ef-step">curate</span><span class="ef-arrow">&rarr;</span><span class="ef-step ef-studio">Studio</span>
+  </div>
+
+  <div class="features-grid">
+    <!-- Catalog -->
+    <div class="feature-card c-blue">
+      <div class="feature-icon blue">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></svg>
+      </div>
+      <div class="feature-title">The Catalog</div>
+      <div class="feature-desc">Register every episode into an append-only set of Parquet tables, annotated with quality. Query it with SQL &mdash; zero-server (embedded DuckDB), local dir or cloud bucket, readable by pandas/Polars without Forge.</div>
+      <div class="feature-code">
+        <span class="prompt">$ </span><span class="cmd">forge ingest</span> <span class="arg">s3://lab/raw/</span> <span class="flag">-c ./catalog</span>
+      </div>
+    </div>
+
+    <!-- Semantic search -->
+    <div class="feature-card c-purple">
+      <div class="feature-icon purple">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><path d="M8 11h6M11 8v6"/></svg>
+      </div>
+      <div class="feature-title">Semantic Search</div>
+      <div class="feature-desc">Embed episodes with SigLIP (a shared image&ndash;text model) and search by natural language &mdash; text queries match episode <em>video</em>, not just metadata. GPU auto-detected; sub-second cosine in DuckDB.</div>
+      <div class="feature-code">
+        <span class="prompt">$ </span><span class="cmd">forge search</span> <span class="arg">"picks up the red cup"</span> <span class="flag">--top 10</span>
+      </div>
+    </div>
+
+    <!-- Dedup & curation -->
+    <div class="feature-card c-orange">
+      <div class="feature-icon orange">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="9" height="9" rx="2"/><rect x="11" y="11" width="9" height="9" rx="2"/></svg>
+      </div>
+      <div class="feature-title">Dedup &amp; Curation</div>
+      <div class="feature-desc">Find near-duplicate episodes across the whole corpus from the embeddings, then curate a clean, labeled training set by policy (keep-higher-quality, keep-longer&hellip;). An append-log &mdash; nothing is ever deleted.</div>
+      <div class="feature-code">
+        <span class="prompt">$ </span><span class="cmd">forge curate</span> <span class="flag">--dedup 0.97 --label approved</span>
+      </div>
+    </div>
+
+    <!-- Forge Studio -->
+    <div class="feature-card c-teal">
+      <div class="feature-icon teal">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+      </div>
+      <div class="feature-title">Forge Studio</div>
+      <div class="feature-desc">A self-contained, themed HTML app to explore the catalog &mdash; Overview, Corpus (thumbnails + quality rings), Dedup review (keep/reject pairs), and Snapshot. Real data + video thumbnails embedded; one shareable file, no server.</div>
+      <div class="feature-code">
+        <span class="prompt">$ </span><span class="cmd">forge studio</span> <span class="flag">-c ./catalog -o studio.html</span>
+      </div>
+    </div>
+
+    <!-- Cloud native -->
+    <div class="feature-card c-green">
+      <div class="feature-icon green">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
+      </div>
+      <div class="feature-title">Cloud Native</div>
+      <div class="feature-desc">Every command that takes a path also accepts <code>s3://</code> and <code>gs://</code> URIs &mdash; datasets and catalogs alike. Auth uses your standard AWS/GCP credential chain; Forge never handles credentials itself.</div>
+      <div class="feature-code">
+        <span class="prompt">$ </span><span class="cmd">forge quality</span> <span class="arg">s3://my-bucket/droid</span>
+      </div>
+    </div>
+
+    <!-- Reproducible -->
+    <div class="feature-card c-rose">
+      <div class="feature-icon rose">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+      </div>
+      <div class="feature-title">Idempotent &amp; Versioned</div>
+      <div class="feature-desc">Re-running ingest or embed is a no-op &mdash; episodes are keyed by content hash. Quality scores and embeddings are versioned; commits are atomic (manifest-last), so a crash never leaves a partial batch.</div>
+      <div class="feature-code">
+        <span class="prompt">$ </span><span class="cmd">forge query</span> <span class="arg">"SELECT task, count(*) ..."</span>
       </div>
     </div>
   </div>
@@ -1431,6 +1546,16 @@
       <div class="feature-code">
         <span class="prompt">$ </span><span class="cmd">forge convert</span> <span class="arg">droid</span> <span class="arg">./output</span> <span class="flag">--format lerobot-v3</span><br>
         <span class="prompt">$ </span><span class="cmd">forge tokenize write</span> <span class="arg">./output</span> <span class="arg">./tokenized</span>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-num">4</div>
+      <div class="step-title">Build a corpus</div>
+      <div class="step-desc">Ingest into a catalog, then query, search, and curate across every dataset you collect.</div>
+      <div class="feature-code">
+        <span class="prompt">$ </span><span class="cmd">forge ingest</span> <span class="arg">./output</span> <span class="flag">-c ./catalog</span><br>
+        <span class="prompt">$ </span><span class="cmd">forge search</span> <span class="arg">"regrasp after a failed pick"</span>
       </div>
     </div>
   </div>
