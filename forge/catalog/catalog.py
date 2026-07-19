@@ -124,29 +124,30 @@ class Catalog:
         *,
         episodes: list[dict] | None = None,
         quality_scores: list[dict] | None = None,
+        embeddings: list[dict] | None = None,
         batch_id: str | None = None,
         ingest_date: str | None = None,
     ) -> str:
         """Validate and atomically commit a batch across tables. Returns batch_id.
 
-        Episodes and their quality scores commit together (manifest written
-        last), so an episode is either fully present across both tables or not
-        at all.
+        Rows for the tables passed here commit together (manifest written last),
+        so a batch is either fully present or not at all.
         """
         import uuid
 
         batch_id = batch_id or uuid.uuid4().hex
         ingest_date = ingest_date or _utc_now().date().isoformat()
 
+        staged = {
+            "episodes": episodes,
+            "quality_scores": quality_scores,
+            "embeddings": embeddings,
+        }
         tables: dict[str, pa.Table] = {}
-        if episodes:
-            schema, _ = TABLES["episodes"]
-            tables["episodes"] = validate_rows(episodes, schema, table="episodes")
-        if quality_scores:
-            schema, _ = TABLES["quality_scores"]
-            tables["quality_scores"] = validate_rows(
-                quality_scores, schema, table="quality_scores"
-            )
+        for name, rows in staged.items():
+            if rows:
+                schema, _ = TABLES[name]
+                tables[name] = validate_rows(rows, schema, table=name)
         if tables:
             self._writer.commit_batch(batch_id, tables, ingest_date=ingest_date)
         return batch_id
@@ -160,6 +161,10 @@ class Catalog:
     ) -> str:
         """Commit a batch of ``quality_scores`` rows (e.g. a re-score backfill)."""
         return self.commit_batch(quality_scores=rows, batch_id=batch_id)
+
+    def add_embeddings(self, rows: list[dict], *, batch_id: str | None = None) -> str:
+        """Commit a batch of ``embeddings`` rows (from an embed backfill)."""
+        return self.commit_batch(embeddings=rows, batch_id=batch_id)
 
     # -- reads --------------------------------------------------------------
 
@@ -288,6 +293,116 @@ class Catalog:
         """
         tbl = self.sql("SELECT content_hash FROM episodes")
         return set(tbl.column("content_hash").to_pylist())
+
+    # -- embeddings & search -----------------------------------------------
+
+    def embedding_model_ids(self) -> list[str]:
+        """Distinct ``model_id``s present in the embeddings table."""
+        tbl = self.sql("SELECT DISTINCT model_id FROM embeddings ORDER BY model_id")
+        return tbl.column("model_id").to_pylist()
+
+    def embedded_episode_ids(self, model_id: str) -> set[str]:
+        """Episode ids already embedded for ``model_id`` (for idempotent embed)."""
+        tbl = self.sql(
+            "SELECT DISTINCT episode_id FROM embeddings WHERE model_id = '"
+            + model_id.replace("'", "''")
+            + "'"
+        )
+        return set(tbl.column("episode_id").to_pylist())
+
+    def _resolve_model_id(self, model_id: str | None) -> str:
+        ids = self.embedding_model_ids()
+        if not ids:
+            raise CatalogError(
+                "No embeddings in this catalog. Run `forge embed` first."
+            )
+        if model_id is None:
+            if len(ids) == 1:
+                return ids[0]
+            raise CatalogError(
+                "Multiple embedding models present; pass model_id explicitly. "
+                f"Available: {ids}"
+            )
+        if model_id not in ids:
+            raise CatalogError(f"model_id {model_id!r} not in catalog. Available: {ids}")
+        return model_id
+
+    def search(
+        self,
+        query: str | None = None,
+        *,
+        like: str | None = None,
+        model_id: str | None = None,
+        level: str = "episode",
+        camera: str | None = None,
+        top: int = 20,
+        device: str = "auto",
+    ) -> pa.Table:
+        """Semantic search over episode embeddings. Returns a ranked pyarrow Table.
+
+        Provide either ``query`` (text → embedded with the model's text tower)
+        or ``like`` (an episode_id → uses that episode's vector). Exactly one
+        ``model_id`` is used per search; if the catalog has several and none is
+        given, this raises.
+        """
+        import numpy as np
+
+        if (query is None) == (like is None):
+            raise ValueError("Provide exactly one of `query` (text) or `like` (episode_id).")
+
+        model_id = self._resolve_model_id(model_id)
+        esc = lambda s: s.replace("'", "''")  # noqa: E731
+        dim_rows = self.sql(
+            f"SELECT DISTINCT dim FROM embeddings WHERE model_id = '{esc(model_id)}'"
+        ).to_pylist()
+        dim = int(dim_rows[0]["dim"])
+
+        if like is not None:
+            where = f"episode_id = '{esc(like)}' AND model_id = '{esc(model_id)}' AND level = '{esc(level)}'"
+            if camera:
+                where += f" AND camera = '{esc(camera)}'"
+            vecs = self.sql(f"SELECT vector FROM embeddings WHERE {where}").to_pylist()
+            if not vecs:
+                raise CatalogError(
+                    f"episode {like!r} has no {level} embeddings for {model_id}"
+                )
+            qv = np.asarray([v["vector"] for v in vecs], dtype=np.float32).mean(axis=0)
+        else:
+            from forge.embed import get_model
+
+            name = model_id.split("@", 1)[0]
+            model = get_model(name, device=device)
+            qv = np.asarray(model.embed_text([query])[0], dtype=np.float32)
+
+        norm = float(np.linalg.norm(qv)) or 1.0
+        qv = qv / norm
+        qlit = "[" + ",".join(f"{float(x):.8g}" for x in qv) + "]"
+
+        where = f"emb.model_id = '{esc(model_id)}' AND emb.level = '{esc(level)}'"
+        if camera:
+            where += f" AND emb.camera = '{esc(camera)}'"
+
+        # One row per episode (best-matching camera), ranked by cosine.
+        return self.sql(
+            f"""
+            SELECT episode_id, score, camera, language_instruction, source_uri
+            FROM (
+                SELECT emb.episode_id, emb.camera,
+                       array_cosine_similarity(
+                           emb.vector::FLOAT[{dim}], {qlit}::FLOAT[{dim}]
+                       ) AS score,
+                       ep.language_instruction, ep.source_uri
+                FROM embeddings emb
+                JOIN episodes ep USING(episode_id)
+                WHERE {where}
+                QUALIFY row_number() OVER (
+                    PARTITION BY emb.episode_id ORDER BY score DESC
+                ) = 1
+            )
+            ORDER BY score DESC
+            LIMIT {int(top)}
+            """
+        )
 
     def stats(self) -> dict[str, Any]:
         """Return summary statistics as canned SQL through :meth:`sql`."""

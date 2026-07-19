@@ -15,16 +15,19 @@ picture.
 ```
 catalog_example_droid_100/
 ├── catalog.json                                          # schema version, forge version, created_at
-├── episodes/ingest_date=2026-07-18/part-*.parquet        # 100 rows — one per episode (facts)
-├── quality_scores/ingest_date=2026-07-18/part-*.parquet  # 100 rows — quality per episode
+├── episodes/ingest_date=.../part-*.parquet               # 100 rows — one per episode (facts)
+├── quality_scores/ingest_date=.../part-*.parquet         # 100 rows — quality per episode
+├── embeddings/ingest_date=.../part-*.parquet             # 346 rows — SigLIP vectors (vision + text)
 └── _batches/<batch_id>/
     ├── manifest-*.json                                   # commit marker
     └── _checkpoint.json                                  # ingest progress marker
 ```
 
-The whole thing is **~44 KB** — the catalog stores derived *facts* (metadata +
-quality scores), never the raw ~460 MB of videos. Episodes reference their raw
-data by `source_uri`.
+The whole thing is **~2.2 MB** — the catalog stores derived *facts* (metadata,
+quality scores, embedding vectors), never the raw ~460 MB of videos. Episodes
+reference their raw data by `source_uri`. The `embeddings` table holds 346
+SigLIP vectors (D=1152): a per-camera vision vector for each of the 100 episodes
+(300) plus an instruction text vector for the 46 episodes that have one.
 
 Summary of this catalog:
 
@@ -46,6 +49,19 @@ forge query "SELECT e.language_instruction, round(q.overall_score, 2) AS score
 # Frame-count distribution
 forge query "SELECT min(num_frames), max(num_frames), round(avg(num_frames)) AS avg
              FROM episodes" -c forge/catalog/catalog_example_droid_100
+```
+
+### Semantic search (embeddings included)
+
+This example ships with SigLIP embeddings, so search works out of the box:
+
+```bash
+# Image-to-image — find episodes visually similar to one you pick. No model needed.
+forge search --like <episode_id> -c forge/catalog/catalog_example_droid_100
+
+# Text search — needs the [embed] extra to encode the query text.
+pip install "forge-robotics[embed]"
+forge search "close the drawer" -c forge/catalog/catalog_example_droid_100 --top 5
 ```
 
 Because it's plain Parquet, you can also read it with anything else — no Forge:
@@ -70,6 +86,7 @@ export AWS_ENDPOINT_URL=http://127.0.0.1:9000
 forge catalog init forge/catalog/catalog_example_droid_100
 forge ingest s3://forge-datasets/droid_100 \
     --catalog forge/catalog/catalog_example_droid_100
+forge embed --catalog forge/catalog/catalog_example_droid_100   # SigLIP on MPS/CUDA/CPU
 ```
 
 ### Reproduce it yourself (no MinIO required)
@@ -78,11 +95,14 @@ forge ingest s3://forge-datasets/droid_100 \
 catalog straight from `hf://`:
 
 ```bash
-pip install "forge-robotics[catalog,lerobot,hub]"
+pip install "forge-robotics[catalog,lerobot,hub,embed]"
 
 forge catalog init /tmp/droid_100_catalog
 forge ingest hf://lerobot/droid_100 --catalog /tmp/droid_100_catalog
+forge embed --catalog /tmp/droid_100_catalog
 forge catalog stats -c /tmp/droid_100_catalog
+forge search "close the drawer" -c /tmp/droid_100_catalog
 ```
 
-Re-running the ingest is a no-op — episodes are skipped by content hash.
+Re-running ingest or embed is a no-op — episodes are skipped by content hash /
+model_id.

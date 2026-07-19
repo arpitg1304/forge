@@ -9,6 +9,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Catalog embeddings + semantic search (Phase 2).** Embed the episodes in a
+  catalog and search them by natural language.
+
+  ```bash
+  pip install "forge-robotics[embed]"
+  forge embed --catalog ./forge-catalog
+  forge search "picks up the red cup" -c ./forge-catalog --top 10
+  forge search --like <episode_id> -c ./forge-catalog
+  ```
+
+  - New `embeddings` table (bumps catalog `SCHEMA_VERSION` 1 → 2, additive — v1
+    catalogs open unchanged). One row per `(episode_id, model_id, level,
+    camera)`: episode-level **vision** vectors per camera + an **instruction**
+    (text) vector.
+  - New `forge/embed/` engine — an `EmbeddingModel` registry with a **SigLIP**
+    (`siglip-so400m`, shared image–text space) implementation, so text queries
+    match episode video. Device auto-selects **CUDA → Apple MPS → CPU**.
+  - `forge embed` (backfill) and `forge ingest --embed` (opt-in stage); `forge
+    search` (text and `--like`) and `Catalog.search(...)`. Brute-force cosine in
+    DuckDB — sub-second at lab scale.
+  - Vectors are versioned per model (`model_id = <name>@<ckpt-hash>`,
+    reproducible across machines); search enforces a single `model_id` (never
+    mixes vector spaces).
+  - Reuses existing internals — the readers behind `forge inspect` for frames,
+    `forge.io` for cloud sources, `[video]` for decode, and the catalog
+    writer/commit machinery. New deps behind the `[embed]` extra (torch,
+    transformers); the base CLI never imports them.
+  - See [forge/embed/README.md](forge/embed/README.md).
+
 - **The catalog (Phase 1) — an append-only, queryable registry of episodes.**
   Turns Forge from a per-dataset tool into a system of record: a set of
   append-only Parquet tables (`episodes`, `quality_scores`) written with pyarrow

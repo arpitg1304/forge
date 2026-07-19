@@ -133,6 +133,12 @@ def ingest_cmd(
     strict: bool = typer.Option(
         False, "--strict", help="Fail on the first episode error instead of skipping"
     ),
+    embed: bool = typer.Option(
+        False, "--embed", help="Also embed ingested episodes (requires [embed] extra)"
+    ),
+    embed_model: str = typer.Option(
+        None, "--embed-model", help="Model for --embed (default: siglip-so400m)"
+    ),
 ) -> None:
     """Ingest datasets into a catalog: register + quality-score each episode.
 
@@ -170,6 +176,21 @@ def ingest_cmd(
         f"[red]{stats.failed}[/red] failed, "
         f"{stats.frames:,} frames"
     )
+
+    if embed:
+        from forge.catalog.embed import embed_catalog
+        from forge.core.exceptions import ForgeError
+
+        try:
+            estats = embed_catalog(cat, model_name=embed_model, console=console)
+        except ForgeError as e:
+            console.print(f"[red]Embed error:[/red] {e}")
+            raise typer.Exit(1)
+        console.print(
+            f"[green]Embed complete[/green] ({estats.model_id}): "
+            f"[cyan]{estats.embedded}[/cyan] embedded "
+            f"({estats.vision_rows} vision + {estats.text_rows} text vectors)"
+        )
 
 
 def query_cmd(
@@ -237,8 +258,151 @@ def _fmt_cell(value) -> str:
     return str(value)
 
 
+def _render_result(result, output_format: str) -> None:
+    """Print a pyarrow query/search result as table / json / csv."""
+    rows = result.to_pylist()
+    if output_format == "json":
+        console.print_json(json.dumps(rows, default=str))
+        return
+    if output_format == "csv":
+        import csv
+        import io
+
+        buf = io.StringIO()
+        writer = csv.writer(buf)
+        writer.writerow(result.column_names)
+        for r in rows:
+            writer.writerow([r.get(c) for c in result.column_names])
+        print(buf.getvalue(), end="")
+        return
+    if not rows:
+        console.print("[dim](no rows)[/dim]")
+        return
+    table = Table(show_header=True, header_style="bold")
+    for col in result.column_names:
+        table.add_column(col)
+    for r in rows[:1000]:
+        table.add_row(*[_fmt_cell(r.get(c)) for c in result.column_names])
+    console.print(table)
+    if len(rows) > 1000:
+        console.print(f"[dim]… {len(rows) - 1000} more rows (use --format json/csv)[/dim]")
+
+
+def embed_cmd(
+    catalog: str = typer.Option(..., "--catalog", "-c", help="Catalog root"),
+    model: str = typer.Option(
+        None, "--model", "-m", help="Embedding model (default: siglip-so400m)"
+    ),
+    device: str = typer.Option(
+        "auto", "--device", help="cuda | mps | cpu | auto (default: auto)"
+    ),
+    cameras: str = typer.Option(
+        None, "--cameras", help="Comma-separated camera names to embed (default: all)"
+    ),
+    sample_hz: float = typer.Option(
+        1.0, "--sample-hz", help="Frame sampling rate for pooling (default: 1.0)"
+    ),
+    pooling: str = typer.Option(
+        "mean", "--pooling", help="mean | first-mid-last"
+    ),
+    batch_size: int = typer.Option(
+        64, "--batch-size", help="Flush embeddings every N episodes"
+    ),
+) -> None:
+    """Compute embeddings for a catalog's episodes (vision per camera + instruction).
+
+    Re-running is a no-op — episodes already embedded for the model are skipped.
+    Requires the [embed] extra (torch + transformers).
+
+    Examples:
+        forge embed -c ./forge-catalog
+        forge embed -c s3://lab-bucket/forge-catalog --device cuda
+    """
+    _require_catalog_deps()
+    from forge.catalog import Catalog
+    from forge.catalog.embed import embed_catalog
+    from forge.core.exceptions import ForgeError
+
+    cam_list = [c.strip() for c in cameras.split(",")] if cameras else None
+    try:
+        cat = Catalog.open(catalog)
+        stats = embed_catalog(
+            cat,
+            model_name=model,
+            device=device,
+            cameras=cam_list,
+            sample_hz=sample_hz,
+            pooling=pooling,
+            batch_size=batch_size,
+            console=console,
+        )
+    except ForgeError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1)
+
+    console.print(
+        f"[green]Embed complete[/green] ({stats.model_id}): "
+        f"[cyan]{stats.embedded}[/cyan] episodes embedded, "
+        f"[yellow]{stats.skipped}[/yellow] skipped, "
+        f"[red]{stats.failed}[/red] failed "
+        f"({stats.vision_rows} vision + {stats.text_rows} text vectors)"
+    )
+
+
+def search_cmd(
+    query: str = typer.Argument(
+        None, help="Text query (omit when using --like)"
+    ),
+    catalog: str = typer.Option(..., "--catalog", "-c", help="Catalog root"),
+    like: str = typer.Option(
+        None, "--like", help="Find episodes similar to this episode_id"
+    ),
+    top: int = typer.Option(20, "--top", "-k", help="Number of results"),
+    level: str = typer.Option(
+        "episode", "--level", help="episode (vision) | instruction (text)"
+    ),
+    camera: str = typer.Option(None, "--camera", help="Restrict to one camera view"),
+    model: str = typer.Option(None, "--model", "-m", help="model_id (if catalog has several)"),
+    device: str = typer.Option("auto", "--device", help="Device for the text encoder"),
+    output_format: str = typer.Option(
+        "table", "--format", "-f", help="table | json | csv"
+    ),
+) -> None:
+    """Semantic search over a catalog's embeddings.
+
+    Examples:
+        forge search "picks up the red cup" -c ./forge-catalog --top 10
+        forge search --like <episode_id> -c ./forge-catalog
+    """
+    _require_catalog_deps()
+    from forge.catalog import Catalog
+    from forge.core.exceptions import ForgeError
+
+    if query is None and like is None:
+        console.print("[red]Error:[/red] provide a text query or --like <episode_id>.")
+        raise typer.Exit(1)
+
+    try:
+        result = Catalog.open(catalog).search(
+            query,
+            like=like,
+            model_id=model,
+            level=level,
+            camera=camera,
+            top=top,
+            device=device,
+        )
+    except ForgeError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1)
+
+    _render_result(result, output_format)
+
+
 def register_catalog_cli(app: typer.Typer) -> None:
     """Attach catalog commands to the main forge Typer app."""
     app.add_typer(catalog_app, name="catalog")
     app.command("ingest")(ingest_cmd)
     app.command("query")(query_cmd)
+    app.command("embed")(embed_cmd)
+    app.command("search")(search_cmd)

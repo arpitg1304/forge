@@ -289,6 +289,25 @@ df = cat.sql("SELECT robot, avg(overall_score) FROM episodes "
 
 Ingestion reuses Forge's existing readers (the metadata behind `forge inspect`) and scorer (the engine behind `forge quality`), so the catalog stays consistent with the rest of the toolkit. Writes go through pyarrow; reads through DuckDB; nothing else touches catalog files. See [forge/catalog/README.md](forge/catalog/README.md) for the architecture, storage layout, and commit protocol.
 
+### Semantic search
+
+Embed the episodes in a catalog, then search them by natural language — "find me the regrasp-after-a-failed-pick episodes" instead of scrolling folders. Uses [SigLIP](https://huggingface.co/google/siglip-so400m-patch14-384) (a shared image–text model), so text queries match episode *video*, not just metadata.
+
+```bash
+pip install "forge-robotics[embed]"
+
+# Embed every episode (vision per camera + instruction text). GPU auto-detected
+# (CUDA → Apple MPS → CPU); re-running is a no-op.
+forge embed --catalog ./forge-catalog
+
+# Search by text …
+forge search "picks up the red cup" -c ./forge-catalog --top 10
+# … or find visually-similar episodes to one you already like
+forge search --like <episode_id> -c ./forge-catalog
+```
+
+Vectors are versioned per model (`model_id = siglip-so400m@<ckpt-hash>`) and stored in the same append-only catalog. Brute-force cosine in DuckDB is sub-second at lab scale. See [forge/embed/README.md](forge/embed/README.md) for models, device selection, and reproducibility.
+
 ## Dataset Registry
 
 A curated catalog of 23+ prominent robotics datasets — browse, search, and download by name instead of memorizing URIs. **[Browse the registry online](https://arpitg1304.github.io/forge/registry.html)**
