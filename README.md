@@ -250,6 +250,45 @@ forge dedup ./my_dataset ./deduped --method dhash        # phash (default) | dha
 
 See [forge/dedup/README.md](forge/dedup/README.md) for the algorithm and tuning.
 
+## The catalog
+
+Forge is a per-dataset tool by default. The **catalog** turns it into a *system of record*: an append-only set of Parquet tables that registers every episode you ingest and annotates it with quality scores, all queryable with SQL. It's zero-server (just Parquet + embedded DuckDB), works on a local directory or an `s3://` / `gs://` bucket, and is readable by pandas/Polars/Spark without Forge.
+
+```bash
+pip install "forge-robotics[catalog]"
+
+# 1. Create a catalog (local dir or cloud bucket)
+forge catalog init ./forge-catalog
+
+# 2. Ingest datasets — registers + quality-scores each episode.
+#    Re-running is a no-op (episodes are skipped by content hash).
+forge ingest ./my_dataset --catalog ./forge-catalog
+forge ingest s3://lab-bucket/raw/2026-07-18/ -c ./forge-catalog
+
+# 3. Query with SQL (views: episodes, quality_scores, v_latest_quality)
+forge query "SELECT task, count(*) FROM episodes GROUP BY task" -c ./forge-catalog
+forge query "SELECT e.language_instruction, q.overall_score
+             FROM episodes e JOIN v_latest_quality q USING(episode_id)
+             ORDER BY q.overall_score DESC LIMIT 10" -c ./forge-catalog --format json
+
+# 4. Summary stats
+forge catalog stats --catalog ./forge-catalog
+```
+
+Python API:
+
+```python
+from forge.catalog import Catalog
+from forge.catalog.ingest import ingest
+
+cat = Catalog.init("s3://lab-bucket/forge-catalog")
+ingest(["s3://lab-bucket/raw/2026-07-18/"], cat)
+df = cat.sql("SELECT robot, avg(overall_score) FROM episodes "
+             "JOIN v_latest_quality USING(episode_id) GROUP BY robot").to_pandas()
+```
+
+Ingestion reuses Forge's existing readers (the metadata behind `forge inspect`) and scorer (the engine behind `forge quality`), so the catalog stays consistent with the rest of the toolkit. Writes go through pyarrow; reads through DuckDB; nothing else touches catalog files. See [forge/catalog/README.md](forge/catalog/README.md) for the architecture, storage layout, and commit protocol.
+
 ## Dataset Registry
 
 A curated catalog of 23+ prominent robotics datasets — browse, search, and download by name instead of memorizing URIs. **[Browse the registry online](https://arpitg1304.github.io/forge/registry.html)**

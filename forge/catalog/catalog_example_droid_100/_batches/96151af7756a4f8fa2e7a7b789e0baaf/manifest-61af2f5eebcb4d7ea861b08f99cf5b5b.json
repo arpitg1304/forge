@@ -1,0 +1,17 @@
+{
+  "batch_id": "96151af7756a4f8fa2e7a7b789e0baaf",
+  "files": [
+    {
+      "path": "episodes/ingest_date=2026-07-18/part-923c824ae5744b248bb406c3509d0da7.parquet",
+      "rows": 100,
+      "table": "episodes"
+    },
+    {
+      "path": "quality_scores/ingest_date=2026-07-18/part-c39e4fef7f7240b5b4a385b97692365b.parquet",
+      "rows": 100,
+      "table": "quality_scores"
+    }
+  ],
+  "ingest_date": "2026-07-18",
+  "schema_version": 1
+}

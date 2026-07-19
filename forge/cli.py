@@ -27,6 +27,14 @@ tokenize_app = typer.Typer(
     help="Action tokenizers - discretize action streams into tokens.",
 )
 app.add_typer(tokenize_app, name="tokenize")
+
+# Catalog commands (forge catalog init/stats, forge ingest, forge query). Wired
+# via a lightweight helper so the base CLI never imports pyarrow/duckdb — those
+# load only when a catalog command actually runs.
+from forge.catalog.cli import register_catalog_cli  # noqa: E402
+
+register_catalog_cli(app)
+
 console = Console()
 
 
