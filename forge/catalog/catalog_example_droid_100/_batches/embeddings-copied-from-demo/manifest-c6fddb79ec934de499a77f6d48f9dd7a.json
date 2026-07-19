@@ -1,0 +1,12 @@
+{
+  "batch_id": "embeddings-copied-from-demo",
+  "files": [
+    {
+      "path": "embeddings/ingest_date=2026-07-19/part-b53f9340e5f24d0096e5eef86c68e163.parquet",
+      "rows": 346,
+      "table": "embeddings"
+    }
+  ],
+  "ingest_date": "2026-07-19",
+  "schema_version": 2
+}

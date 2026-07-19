@@ -18,7 +18,9 @@ from forge.core.exceptions import ForgeError
 
 # Bump when the catalog table schemas change in a breaking way. catalog.json
 # records this; Forge refuses to open a catalog written by a newer version.
-SCHEMA_VERSION = 1
+# v2 (Phase 2) adds the additive `embeddings` table — backward compatible, so
+# v1 catalogs open unchanged and gain the table on first embed.
+SCHEMA_VERSION = 2
 
 # Version tag stamped on every quality_scores row. The quality module has no
 # version of its own today, so the catalog owns this constant. Bump it when the
@@ -87,10 +89,29 @@ QUALITY_SCORES_SCHEMA = pa.schema(
     ]
 )
 
+# One row per (episode_id, model_id, level, camera). Vectors are stored as a
+# variable-length list<float32> (+ an explicit `dim`) rather than a fixed-size
+# list, because one table holds multiple model_ids with different dimensions.
+# Search filters to a single model_id, then casts to FLOAT[dim] for cosine.
+EMBEDDINGS_SCHEMA = pa.schema(
+    [
+        pa.field("episode_id", pa.string(), nullable=False),
+        pa.field("model_id", pa.string(), nullable=False),
+        pa.field("level", pa.string(), nullable=False),  # episode | instruction
+        pa.field("camera", pa.string()),  # null for instruction level
+        pa.field("pooling", pa.string(), nullable=False),
+        pa.field("dim", pa.int32(), nullable=False),
+        pa.field("vector", pa.list_(pa.float32()), nullable=False),
+        pa.field("num_frames_sampled", pa.int32()),
+        pa.field("computed_at", pa.timestamp("us", tz="UTC"), nullable=False),
+    ]
+)
+
 # Logical table name -> (pyarrow schema, partition column).
 TABLES: dict[str, tuple[pa.Schema, str]] = {
     "episodes": (EPISODES_SCHEMA, "ingest_date"),
     "quality_scores": (QUALITY_SCORES_SCHEMA, "ingest_date"),
+    "embeddings": (EMBEDDINGS_SCHEMA, "ingest_date"),
 }
 
 
