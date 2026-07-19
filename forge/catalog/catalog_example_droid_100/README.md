@@ -64,6 +64,17 @@ pip install "forge-robotics[embed]"
 forge search "close the drawer" -c forge/catalog/catalog_example_droid_100 --top 5
 ```
 
+### Dedup, curation & Studio
+
+It also ships `dedup_edges` (24 near-dup pairs at cosine ≥ 0.9) and
+`curation_labels` (84 approved / 16 dedup-rejected), so curation and the visual
+app work immediately:
+
+```bash
+forge curate -c forge/catalog/catalog_example_droid_100 --dedup 0.9 --label approved
+forge studio -c forge/catalog/catalog_example_droid_100 -o studio.html && open studio.html
+```
+
 Because it's plain Parquet, you can also read it with anything else — no Forge:
 
 ```bash

@@ -1,0 +1,12 @@
+{
+  "batch_id": "64d8d3c210bd4ebcb0f62f2be9a5ab4a",
+  "files": [
+    {
+      "path": "dedup_edges/ingest_date=2026-07-19/part-862f6e26c4204e5ba776615aeaa012ee.parquet",
+      "rows": 24,
+      "table": "dedup_edges"
+    }
+  ],
+  "ingest_date": "2026-07-19",
+  "schema_version": 3
+}

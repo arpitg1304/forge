@@ -125,6 +125,8 @@ class Catalog:
         episodes: list[dict] | None = None,
         quality_scores: list[dict] | None = None,
         embeddings: list[dict] | None = None,
+        dedup_edges: list[dict] | None = None,
+        curation_labels: list[dict] | None = None,
         batch_id: str | None = None,
         ingest_date: str | None = None,
     ) -> str:
@@ -142,6 +144,8 @@ class Catalog:
             "episodes": episodes,
             "quality_scores": quality_scores,
             "embeddings": embeddings,
+            "dedup_edges": dedup_edges,
+            "curation_labels": curation_labels,
         }
         tables: dict[str, pa.Table] = {}
         for name, rows in staged.items():
@@ -165,6 +169,16 @@ class Catalog:
     def add_embeddings(self, rows: list[dict], *, batch_id: str | None = None) -> str:
         """Commit a batch of ``embeddings`` rows (from an embed backfill)."""
         return self.commit_batch(embeddings=rows, batch_id=batch_id)
+
+    def add_dedup_edges(self, rows: list[dict], *, batch_id: str | None = None) -> str:
+        """Commit a batch of ``dedup_edges`` rows (near-duplicate pairs)."""
+        return self.commit_batch(dedup_edges=rows, batch_id=batch_id)
+
+    def add_curation_labels(
+        self, rows: list[dict], *, batch_id: str | None = None
+    ) -> str:
+        """Commit a batch of ``curation_labels`` rows (append-log decisions)."""
+        return self.commit_batch(curation_labels=rows, batch_id=batch_id)
 
     # -- reads --------------------------------------------------------------
 
@@ -262,6 +276,49 @@ class Catalog:
                 PARTITION BY episode_id
                 ORDER BY scorer_version DESC, computed_at DESC
             ) = 1
+            """
+        )
+        # Latest curation label per episode (append-log; newest wins).
+        con.execute(
+            """
+            CREATE VIEW v_curation AS
+            SELECT * FROM curation_labels
+            QUALIFY row_number() OVER (
+                PARTITION BY episode_id ORDER BY labeled_at DESC
+            ) = 1
+            """
+        )
+        # Episodes that LOSE a near-dup pairing under a policy, at a threshold.
+        # A table macro so it takes parameters: SELECT * FROM v_dup_losers(0.97,
+        # 'keep-higher-quality'). Loser = the weaker side per policy; ties break
+        # on the greater episode_id (deterministic). An episode losing any
+        # pairing is a loser (union).
+        con.execute(
+            """
+            CREATE MACRO v_dup_losers(thr, policy) AS TABLE (
+                WITH e AS (SELECT * FROM dedup_edges WHERE similarity >= thr),
+                q AS (SELECT episode_id, overall_score FROM v_latest_quality),
+                ep AS (SELECT episode_id, num_frames, ingested_at FROM episodes)
+                SELECT DISTINCT CASE
+                    WHEN policy = 'keep-longer' THEN
+                        CASE WHEN coalesce(pa.num_frames,0) < coalesce(pb.num_frames,0) THEN e.episode_a
+                             WHEN coalesce(pa.num_frames,0) > coalesce(pb.num_frames,0) THEN e.episode_b
+                             ELSE greatest(e.episode_a, e.episode_b) END
+                    WHEN policy = 'keep-first' THEN
+                        CASE WHEN pa.ingested_at < pb.ingested_at THEN e.episode_b
+                             WHEN pa.ingested_at > pb.ingested_at THEN e.episode_a
+                             ELSE greatest(e.episode_a, e.episode_b) END
+                    ELSE  -- keep-higher-quality (default)
+                        CASE WHEN coalesce(qa.overall_score,-1) < coalesce(qb.overall_score,-1) THEN e.episode_a
+                             WHEN coalesce(qa.overall_score,-1) > coalesce(qb.overall_score,-1) THEN e.episode_b
+                             ELSE greatest(e.episode_a, e.episode_b) END
+                END AS episode_id
+                FROM e
+                LEFT JOIN q qa ON qa.episode_id = e.episode_a
+                LEFT JOIN q qb ON qb.episode_id = e.episode_b
+                LEFT JOIN ep pa ON pa.episode_id = e.episode_a
+                LEFT JOIN ep pb ON pb.episode_id = e.episode_b
+            )
             """
         )
         return con
