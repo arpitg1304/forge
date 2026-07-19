@@ -140,13 +140,19 @@ def curate(
     catalog: Catalog,
     *,
     where: str | None = None,
+    ids: list[str] | None = None,
     label: str = "approved",
     reason: str | None = None,
     labeled_by: str = "policy:curate",
     dedup_threshold: float | None = None,
     dedup_policy: str = DEFAULT_POLICY,
 ) -> CurateStats:
-    """Label a WHERE-selected set, dropping near-dup losers under a policy.
+    """Label a selection, dropping near-dup losers under a policy.
+
+    The selection is either an explicit ``ids`` list (from ``forge search`` or
+    Forge Studio) or a SQL ``where`` predicate — or both, in which case ``ids``
+    is filtered by the predicate. ``ids`` are filtered to episodes that actually
+    exist, so typos/stale ids never create dangling labels.
 
     Survivors get ``label`` (default ``approved``); if ``dedup_threshold`` is
     given, the dedup losers within the selection get ``rejected``. Appends to the
@@ -161,9 +167,22 @@ def curate(
         "SELECT e.episode_id FROM episodes e "
         "LEFT JOIN v_latest_quality q USING(episode_id)"
     )
-    if where:
-        base += f" WHERE {where}"
-    selected = [r["episode_id"] for r in catalog.sql(base).to_pylist()]
+    if ids is not None:
+        # Explicit selection: keep order, de-dup, and intersect with the
+        # predicate (if any) and with episodes that actually exist.
+        matched = {
+            r["episode_id"]
+            for r in catalog.sql(base + (f" WHERE {where}" if where else "")).to_pylist()
+        }
+        seen: set[str] = set()
+        selected = [
+            e for e in ids
+            if e in matched and not (e in seen or seen.add(e))
+        ]
+    else:
+        if where:
+            base += f" WHERE {where}"
+        selected = [r["episode_id"] for r in catalog.sql(base).to_pylist()]
     stats.selected = len(selected)
     if not selected:
         return stats

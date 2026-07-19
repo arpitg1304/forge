@@ -281,7 +281,8 @@ $('#nav-pairs').textContent=fmt(D.pairs.length);
   el.innerHTML=`<div class="crumb">curation / <b>dedup review</b></div><h1>Dedup review</h1>
    <div class="sub">${fmt(pairs.length)} pairs above ${D.dedup.threshold} cosine &middot; review, then apply a policy with <span class="mono" style="color:var(--cyan)">forge curate</span></div>
    <div class="dedup-head"><div class="lozenge num">decided <b id="dc">0</b> / ${pairs.length}</div>
-     <button class="btn" id="export">Copy forge curate command</button>
+     <button class="btn" id="download">Download decisions</button>
+     <button class="btn" id="export">Copy policy command</button>
      <div class="kbd-hint"><b>&larr;</b> keep left &nbsp;<b>&rarr;</b> keep right &nbsp;<b>x</b> reject both</div></div>
    <div id="pairs"></div>`;
   const q=(v)=>`<span class="qq num" style="background:${v>=7?'var(--good-soft)':'var(--mid-soft)'};color:${qColor(v)}">${v!=null?v.toFixed(1):'—'}</span>`;
@@ -315,7 +316,19 @@ $('#nav-pairs').textContent=fmt(D.pairs.length);
   $('#export').addEventListener('click',()=>{
     const cmd=`forge curate --catalog ${D.catalog} \\\n  --dedup ${D.dedup.threshold} --dedup-policy keep-higher-quality \\\n  --label approved`;
     navigator.clipboard&&navigator.clipboard.writeText(cmd);
-    $('#export').textContent='Copied ✓';setTimeout(()=>$('#export').textContent='Copy forge curate command',1400);});
+    $('#export').textContent='Copied ✓';setTimeout(()=>$('#export').textContent='Copy policy command',1400);});
+  // Hand-picked decisions -> a selection file for `forge curate --from`.
+  $('#download').addEventListener('click',()=>{
+    const rejected=new Set();
+    pairs.forEach((p,i)=>{const a=decisions[i];
+      if(a==='a')rejected.add(p.b); if(a==='b')rejected.add(p.a);
+      if(a==='reject'){rejected.add(p.a);rejected.add(p.b);}});
+    const sel={episode_ids:[...rejected],label:'rejected',source:'studio-dedup'};
+    const blob=new Blob([JSON.stringify(sel,null,2)],{type:'application/json'});
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+    a.download='studio_decisions.json';a.click();URL.revokeObjectURL(a.href);
+    $('#download').textContent=`Saved ${rejected.size} ✓`;
+    setTimeout(()=>$('#download').textContent='Download decisions',1600);});
 })();
 
 /* ── SNAPSHOT (Phase 4 preview) ── */

@@ -132,9 +132,13 @@ cat.sql("SELECT task, count(*) FROM episodes GROUP BY task")   # -> pyarrow.Tabl
   ANN pass is the scale path (skipped-with-warning until then).
 - **`curation_labels`** — an append-log of decisions (`approved` / `rejected` /
   `held`); latest row wins per episode, history preserved. `forge curate`
-  selects with a WHERE filter, resolves near-dup losers under a **policy**
-  (`keep-higher-quality` / `keep-longer` / `keep-first`), and labels survivors
-  approved, losers rejected.
+  selects episodes three ways — a SQL `--where` predicate, an explicit `--ids`
+  list, or a `--from` selection file — so **semantic search and Forge Studio can
+  drive curation, not just SQL**. It then resolves near-dup losers under a
+  **policy** (`keep-higher-quality` / `keep-longer` / `keep-first`) and labels
+  survivors approved, losers rejected. `forge search --save sel.json` and
+  Studio's dedup tab both emit the `{episode_ids, source}` selection file that
+  `--from` consumes, and the `source` is recorded in `labeled_by` for provenance.
 - **`forge studio`** ([studio.py](studio.py)) renders a self-contained, themed
   HTML app (Overview · Corpus · Dedup review · Snapshot) from real catalog data
   and embedded video thumbnails — the design system matches the Forge Studio
