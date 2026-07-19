@@ -9,6 +9,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Catalog dedup, curation + Forge Studio (Phase 3).** Find near-duplicate
+  episodes from the embeddings and curate a clean, labeled training set.
+
+  ```bash
+  forge catalog dedup -c ./forge-catalog --threshold 0.97
+  forge curate -c ./forge-catalog --where "overall_score > 6" \
+      --dedup 0.97 --dedup-policy keep-higher-quality --label approved
+  forge studio -c ./forge-catalog -o studio.html
+  ```
+
+  - Two new tables (bumps catalog `SCHEMA_VERSION` 2 → 3, additive):
+    `dedup_edges` (near-dup pairs as *facts* — similarity, not verdicts) and
+    `curation_labels` (an append-log of approve/reject/hold decisions,
+    latest-row-wins).
+  - `forge catalog dedup` computes near-dup pairs (cosine over episode
+    embeddings, max over shared cameras; idempotent). `forge curate` applies a
+    WHERE filter + a dedup **policy** (`keep-higher-quality` / `keep-longer` /
+    `keep-first`) and labels survivors approved, dedup losers rejected.
+  - DuckDB views/macros: `v_curation` (latest label per episode) and
+    `v_dup_losers(threshold, policy)`.
+  - **`forge studio`** generates a self-contained, themed HTML app (Overview ·
+    Corpus · Dedup review · Snapshot) from real catalog data and embedded video
+    thumbnails — one shareable file, no server.
+  - Reuses the Phase 2 vectors, the readers for thumbnails, and the catalog
+    writer/commit machinery. The per-dataset `forge dedup` (perceptual-hash) is
+    unchanged; catalog dedup lives under `forge catalog dedup`.
+  - See [forge/catalog/README.md](forge/catalog/README.md).
+
 - **Catalog embeddings + semantic search (Phase 2).** Embed the episodes in a
   catalog and search them by natural language.
 

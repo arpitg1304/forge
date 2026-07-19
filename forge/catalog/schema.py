@@ -5,9 +5,9 @@ source of truth for their pyarrow schemas, the catalog schema version, and the
 current quality scorer version. Every write goes through :func:`validate_rows`,
 which builds a validated ``pyarrow.Table`` and fails loudly on any mismatch.
 
-Phase 1 defines exactly two tables: ``episodes`` (the registry) and
-``quality_scores`` (versioned derived metrics). Later phases (embeddings, dedup,
-curation, snapshots) are intentionally absent.
+Tables by phase: ``episodes`` + ``quality_scores`` (1), ``embeddings`` (2),
+``dedup_edges`` + ``curation_labels`` (3). Snapshots (4) are JSON manifests, not
+a table.
 """
 
 from __future__ import annotations
@@ -17,10 +17,11 @@ import pyarrow as pa
 from forge.core.exceptions import ForgeError
 
 # Bump when the catalog table schemas change in a breaking way. catalog.json
-# records this; Forge refuses to open a catalog written by a newer version.
-# v2 (Phase 2) adds the additive `embeddings` table — backward compatible, so
-# v1 catalogs open unchanged and gain the table on first embed.
-SCHEMA_VERSION = 2
+# records this; Forge refuses to open a catalog written by a newer version. Each
+# bump so far is purely additive (new tables), so older catalogs open unchanged
+# and gain the new tables on first use. v2 added `embeddings`; v3 adds
+# `dedup_edges` and `curation_labels`.
+SCHEMA_VERSION = 3
 
 # Version tag stamped on every quality_scores row. The quality module has no
 # version of its own today, so the catalog owns this constant. Bump it when the
@@ -107,11 +108,39 @@ EMBEDDINGS_SCHEMA = pa.schema(
     ]
 )
 
+# One row per detected near-duplicate pair. Edges record *similarity* — which
+# episode "wins" is decided at curation time by policy, never baked in here
+# (that would freeze the policy). Canonical order: episode_a < episode_b.
+DEDUP_EDGES_SCHEMA = pa.schema(
+    [
+        pa.field("episode_a", pa.string(), nullable=False),
+        pa.field("episode_b", pa.string(), nullable=False),
+        pa.field("similarity", pa.float32(), nullable=False),
+        pa.field("model_id", pa.string(), nullable=False),
+        pa.field("method", pa.string(), nullable=False),  # ann-cosine | exact-hash
+        pa.field("computed_at", pa.timestamp("us", tz="UTC"), nullable=False),
+    ]
+)
+
+# Append-log of human/policy decisions. Latest row wins per episode (resolved
+# with a window function at query time); appending never deletes history.
+CURATION_LABELS_SCHEMA = pa.schema(
+    [
+        pa.field("episode_id", pa.string(), nullable=False),
+        pa.field("label", pa.string(), nullable=False),  # approved | rejected | held
+        pa.field("reason", pa.string()),
+        pa.field("labeled_by", pa.string(), nullable=False),  # user or policy:<name>
+        pa.field("labeled_at", pa.timestamp("us", tz="UTC"), nullable=False),
+    ]
+)
+
 # Logical table name -> (pyarrow schema, partition column).
 TABLES: dict[str, tuple[pa.Schema, str]] = {
     "episodes": (EPISODES_SCHEMA, "ingest_date"),
     "quality_scores": (QUALITY_SCORES_SCHEMA, "ingest_date"),
     "embeddings": (EMBEDDINGS_SCHEMA, "ingest_date"),
+    "dedup_edges": (DEDUP_EDGES_SCHEMA, "ingest_date"),
+    "curation_labels": (CURATION_LABELS_SCHEMA, "ingest_date"),
 }
 
 

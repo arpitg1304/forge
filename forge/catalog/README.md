@@ -108,15 +108,40 @@ for teleop data).
 
 ## Query surface
 
-Views registered on every connection:
+Views/macros registered on every connection:
 
-- `episodes`, `quality_scores` — the raw tables.
+- `episodes`, `quality_scores`, `embeddings`, `dedup_edges`, `curation_labels`
+  — the raw tables.
 - `v_latest_quality` — the quality row for the newest `scorer_version` per
   episode (then most recent `computed_at`).
+- `v_curation` — the latest label per episode (append-log, newest wins).
+- `v_dup_losers(threshold, policy)` — a table macro returning the episodes that
+  *lose* a near-dup pairing under a policy.
 
 ```python
 cat.sql("SELECT task, count(*) FROM episodes GROUP BY task")   # -> pyarrow.Table
 ```
+
+## Dedup, curation & Studio (Phase 3)
+
+- **`dedup_edges`** — near-duplicate pairs as *facts*: `(episode_a, episode_b,
+  similarity, model_id, method)`, canonical order `a < b`. Which episode "wins"
+  is decided at curation, never baked into the edge. `forge catalog dedup`
+  computes them from the Phase 2 embeddings (cosine, max over shared cameras;
+  idempotent). Brute-force is sub-second at lab scale; past ~20k episodes an
+  ANN pass is the scale path (skipped-with-warning until then).
+- **`curation_labels`** — an append-log of decisions (`approved` / `rejected` /
+  `held`); latest row wins per episode, history preserved. `forge curate`
+  selects with a WHERE filter, resolves near-dup losers under a **policy**
+  (`keep-higher-quality` / `keep-longer` / `keep-first`), and labels survivors
+  approved, losers rejected.
+- **`forge studio`** ([studio.py](studio.py)) renders a self-contained, themed
+  HTML app (Overview · Corpus · Dedup review · Snapshot) from real catalog data
+  and embedded video thumbnails — the design system matches the Forge Studio
+  mockup and the `forge visualize` dark theme. One shareable file, no server.
+
+The per-dataset `forge dedup` (perceptual-hash → cleaned dataset) is a separate,
+unchanged command; catalog-level dedup lives under `forge catalog dedup`.
 
 ## Example
 
@@ -130,8 +155,9 @@ commands to reproduce it (from a local MinIO `s3://` source, or straight from
 forge catalog stats -c forge/catalog/catalog_example_droid_100
 ```
 
-## Not in Phase 1
+## Not yet
 
-Embeddings, dedup edges, curation labels, and snapshots (Phases 2–4);
+Snapshots + training-set export (Phase 4: `forge snapshot create/materialize`);
+frame/segment-level embeddings and Lance/ANN for >100k episodes (Phase 5);
 distributed execution, locking, compaction, and gc. The manifest convention is
 in place so gc becomes possible later, but it is not implemented.

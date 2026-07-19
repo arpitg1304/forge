@@ -1,0 +1,12 @@
+{
+  "batch_id": "2480f501d1174b1b89def3ba00b2c687",
+  "files": [
+    {
+      "path": "curation_labels/ingest_date=2026-07-19/part-9bbb958f3df2425ea9ba634325023438.parquet",
+      "rows": 100,
+      "table": "curation_labels"
+    }
+  ],
+  "ingest_date": "2026-07-19",
+  "schema_version": 3
+}

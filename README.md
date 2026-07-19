@@ -308,6 +308,32 @@ forge search --like <episode_id> -c ./forge-catalog
 
 Vectors are versioned per model (`model_id = siglip-so400m@<ckpt-hash>`) and stored in the same append-only catalog. Brute-force cosine in DuckDB is sub-second at lab scale. See [forge/embed/README.md](forge/embed/README.md) for models, device selection, and reproducibility.
 
+### Dedup & curation
+
+Use the embeddings to find near-duplicate episodes (re-encodes, near-identical retakes) and curate a clean, labeled training set. Near-dup pairs are recorded as **facts** (`dedup_edges`); which episode wins is decided at curation time by **policy**.
+
+```bash
+# Find near-duplicate pairs (cosine over episode embeddings)
+forge catalog dedup -c ./forge-catalog --threshold 0.97
+
+# Approve a high-quality selection, dropping dedup losers by policy
+forge curate -c ./forge-catalog \
+    --where "overall_score > 6 AND task = 'pick_place'" \
+    --dedup 0.97 --dedup-policy keep-higher-quality --label approved
+```
+
+Curation is an append-log (`curation_labels`, latest-row-wins); nothing is ever deleted. Policies: `keep-higher-quality`, `keep-longer`, `keep-first`.
+
+### Forge Studio
+
+Generate a self-contained, themed HTML app to explore the catalog visually — Overview, Corpus (with thumbnails + quality rings), Dedup review (keep/reject pairs), and a Snapshot preview:
+
+```bash
+forge studio -c ./forge-catalog -o studio.html && open studio.html
+```
+
+Everything is embedded (real data + video thumbnails as data URIs) — one shareable file, no server. See [forge/catalog/README.md](forge/catalog/README.md).
+
 ## Dataset Registry
 
 A curated catalog of 23+ prominent robotics datasets — browse, search, and download by name instead of memorizing URIs. **[Browse the registry online](https://arpitg1304.github.io/forge/registry.html)**
