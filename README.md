@@ -253,6 +253,13 @@ forge curate -c ./forge-catalog \
     --dedup 0.97 --dedup-policy keep-higher-quality --label approved
 ```
 
+Curation isn't only SQL-driven — **semantic search and visual review can drive it too**. Save a search result (or Studio's keep/reject decisions) to a selection file and label it, provenance included:
+
+```bash
+forge search "regrasp after a failed pick" -c ./forge-catalog --top 20 --save sel.json
+forge curate -c ./forge-catalog --from sel.json --label approved     # or --ids e1,e2,e3
+```
+
 Curation is an append-log (`curation_labels`, latest-wins) — nothing is deleted. Policies: `keep-higher-quality`, `keep-longer`, `keep-first`.
 
 ## 4. Forge Studio

@@ -367,12 +367,16 @@ def search_cmd(
     output_format: str = typer.Option(
         "table", "--format", "-f", help="table | json | csv"
     ),
+    save: str = typer.Option(
+        None, "--save", help="Write the result ids to a selection JSON for `forge curate --from`"
+    ),
 ) -> None:
     """Semantic search over a catalog's embeddings.
 
     Examples:
         forge search "picks up the red cup" -c ./forge-catalog --top 10
-        forge search --like <episode_id> -c ./forge-catalog
+        forge search "regrasp after a failed pick" -c ./cat --save sel.json
+        forge curate -c ./cat --from sel.json --label approved
     """
     _require_catalog_deps()
     from forge.catalog import Catalog
@@ -395,6 +399,17 @@ def search_cmd(
     except ForgeError as e:
         console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1)
+
+    if save:
+        ids = result.column("episode_id").to_pylist()
+        source = f"search: {query!r}" if query else f"search: like {like}"
+        with open(save, "w") as f:
+            json.dump({"episode_ids": ids, "source": source}, f, indent=2)
+        console.print(
+            f"[green]Saved[/green] {len(ids)} ids → [cyan]{save}[/cyan] "
+            f"[dim](feed it to `forge curate --from {save}`)[/dim]"
+        )
+        return
 
     _render_result(result, output_format)
 
@@ -439,6 +454,12 @@ def curate_cmd(
     where: str = typer.Option(
         None, "--where", help="SQL filter over episodes + quality (e.g. \"overall_score > 6\")"
     ),
+    ids: str = typer.Option(
+        None, "--ids", help="Comma-separated episode ids to label (from search / Studio)"
+    ),
+    from_file: str = typer.Option(
+        None, "--from", help="Selection JSON with episode_ids (from `forge search --save` or Studio)"
+    ),
     label: str = typer.Option("approved", "--label", help="Label for survivors"),
     reason: str = typer.Option(None, "--reason", help="Free-text reason"),
     dedup: float = typer.Option(
@@ -452,16 +473,40 @@ def curate_cmd(
 ) -> None:
     """Label a selection of episodes, optionally dropping near-duplicates.
 
+    The selection is a SQL `--where` predicate, an explicit `--ids` list, or a
+    `--from` selection file (produced by `forge search --save` or Forge Studio) —
+    so semantic search and visual review can drive curation, not just SQL.
     Appends to the curation_labels log (latest-row-wins); never deletes history.
 
     Examples:
         forge curate -c ./cat --where "overall_score > 6 AND task='pick_place'" --label approved
         forge curate -c ./cat --dedup 0.97 --dedup-policy keep-higher-quality --label approved
+        forge curate -c ./cat --from sel.json --label approved
     """
     _require_catalog_deps()
     from forge.catalog import Catalog
     from forge.catalog.dedup import compute_dedup_edges, curate
     from forge.core.exceptions import ForgeError
+
+    id_list = None
+    labeled_by = f"user:{by}"
+    if from_file:
+        try:
+            with open(from_file) as f:
+                sel = json.load(f)
+        except (OSError, ValueError) as e:
+            console.print(f"[red]Error:[/red] can't read selection file {from_file}: {e}")
+            raise typer.Exit(1)
+        id_list = sel.get("episode_ids") or []
+        source = sel.get("source")
+        if reason is None:
+            reason = sel.get("reason") or (f"from {source}" if source else None)
+        if source:
+            labeled_by = source
+        if label == "approved" and sel.get("label"):
+            label = sel["label"]
+    elif ids:
+        id_list = [x.strip() for x in ids.split(",") if x.strip()]
 
     try:
         cat = Catalog.open(catalog)
@@ -469,8 +514,8 @@ def curate_cmd(
             # Ensure edges exist at this threshold (idempotent).
             compute_dedup_edges(cat, threshold=dedup)
         stats = curate(
-            cat, where=where, label=label, reason=reason, labeled_by=f"user:{by}",
-            dedup_threshold=dedup, dedup_policy=dedup_policy,
+            cat, where=where, ids=id_list, label=label, reason=reason,
+            labeled_by=labeled_by, dedup_threshold=dedup, dedup_policy=dedup_policy,
         )
     except (ForgeError, ValueError) as e:
         console.print(f"[red]Error:[/red] {e}")

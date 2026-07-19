@@ -170,6 +170,26 @@ class TestCurate:
         with pytest.raises(ValueError, match="unknown dedup policy"):
             curate(dup_catalog, dedup_threshold=0.97, dedup_policy="bogus")
 
+    def test_curate_by_ids(self, dup_catalog):
+        st = curate(dup_catalog, ids=["e0", "e2"], label="approved")
+        assert st.selected == 2 and st.approved == 2
+        labels = {r["episode_id"]: r["label"] for r in dup_catalog.sql(
+            "SELECT episode_id, label FROM v_curation").to_pylist()}
+        assert labels == {"e0": "approved", "e2": "approved"}
+
+    def test_curate_ids_filtered_to_existing(self, dup_catalog):
+        # a typo'd / stale id never creates a dangling label
+        st = curate(dup_catalog, ids=["e0", "does-not-exist"], label="held")
+        assert st.selected == 1
+        assert dup_catalog.sql("SELECT count(*) n FROM curation_labels").to_pylist()[0]["n"] == 1
+
+    def test_curate_ids_intersect_where(self, dup_catalog):
+        # ids [e0(q8), e1(q6)] filtered by score>=7 -> only e0
+        st = curate(dup_catalog, ids=["e0", "e1"], where="overall_score >= 7", label="approved")
+        assert st.selected == 1
+        assert dup_catalog.sql(
+            "SELECT episode_id FROM v_curation").to_pylist()[0]["episode_id"] == "e0"
+
 
 class TestStudio:
     def test_generate_html(self, dup_catalog):
@@ -208,3 +228,37 @@ class TestCLI:
         r = runner.invoke(app, ["studio", "-c", root, "-o", out, "--max-thumbnails", "0"])
         assert r.exit_code == 0, r.output
         assert Path(out).exists()
+
+    def test_search_save_then_curate_from(self, tmp_path: Path, dup_catalog):
+        from typer.testing import CliRunner
+
+        from forge.cli import app
+
+        runner = CliRunner()
+        root = dup_catalog.root_uri
+        sel = str(tmp_path / "sel.json")
+
+        # search --like needs no model; --save writes a selection file
+        r = runner.invoke(app, ["search", "--like", "e0", "-c", root, "--save", sel])
+        assert r.exit_code == 0, r.output
+        saved = json.loads(Path(sel).read_text())
+        assert "e0" in saved["episode_ids"] and "like e0" in saved["source"]
+
+        # curate --from applies it, recording provenance in labeled_by
+        r = runner.invoke(app, ["curate", "-c", root, "--from", sel, "--label", "approved"])
+        assert r.exit_code == 0, r.output
+        rows = dup_catalog.sql(
+            "SELECT DISTINCT labeled_by FROM curation_labels WHERE label='approved'"
+        ).to_pylist()
+        assert any("like e0" in r["labeled_by"] for r in rows)
+
+    def test_curate_ids_flag(self, dup_catalog):
+        from typer.testing import CliRunner
+
+        from forge.cli import app
+
+        r = CliRunner().invoke(
+            app, ["curate", "-c", dup_catalog.root_uri, "--ids", "e0,e2", "--label", "held"]
+        )
+        assert r.exit_code == 0, r.output
+        assert "2" in r.output

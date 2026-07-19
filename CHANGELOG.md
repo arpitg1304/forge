@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Search- and selection-driven curation.** `forge curate` now selects
+  episodes three ways — a SQL `--where` predicate, an explicit `--ids` list, or
+  a `--from <selection.json>` file — so semantic search and Forge Studio can
+  drive curation, not just SQL. `forge search --save sel.json` writes the result
+  ids (with provenance) and Studio's dedup tab exports a matching decisions file;
+  `forge curate --from sel.json` applies them and records the source in
+  `labeled_by`. Explicit ids are filtered to episodes that exist (no dangling
+  labels) and can be intersected with `--where`.
+
 - **Catalog dedup, curation + Forge Studio (Phase 3).** Find near-duplicate
   episodes from the embeddings and curate a clean, labeled training set.
 
