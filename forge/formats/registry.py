@@ -114,6 +114,10 @@ class FormatRegistry:
             )
         return cls._writers[format_name]()
 
+    # Formats whose metadata can be inspected over the network without a full
+    # download (range reads). Used by `forge inspect` to stream cloud datasets.
+    STREAMABLE_FORMATS: frozenset[str] = frozenset({"lerobot-v3", "zarr"})
+
     # Priority order for format detection (more specific formats first)
     _detection_priority: list[str] = [
         "groot",  # Check GR00T before LeRobot (more specific)
@@ -142,7 +146,12 @@ class FormatRegistry:
         Raises:
             FormatDetectionError: If no reader can handle the path.
         """
-        path = Path(path)
+        from forge.io import is_remote_uri
+
+        # Keep remote URIs as strings (Path() would mangle "s3://"); readers'
+        # can_read handle both. Non-streaming readers safely return False for
+        # a remote URI, so only streamable formats match without a download.
+        path = str(path) if is_remote_uri(path) else Path(path)
 
         # Check in priority order first
         for format_name in cls._detection_priority:

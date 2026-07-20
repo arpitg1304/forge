@@ -23,10 +23,13 @@ source string ──▶ localize() ──▶ local Path ──▶ existing reade
    hf://org/repo                    (handled by forge.hub, not here)
 ```
 
-> **Design note:** remote sources are downloaded in full before processing —
-> not range-read/streamed. This keeps readers that seek randomly (video
-> keyframes, HDF5 chunks, rosbag indexes) working without modification. See the
-> [CHANGELOG](../../CHANGELOG.md) for the streaming follow-up.
+> **Design note:** most operations download the remote source in full before
+> processing — this keeps readers that seek randomly (video keyframes, HDF5
+> chunks, rosbag indexes) working without modification. The exception is
+> **`forge inspect` on LeRobot-v3 / Zarr**, which reads metadata over the
+> network via **range requests** ([`DataSource`](source.py)) — inspecting a
+> multi-GB cloud dataset fetches only kilobytes. Streaming the ingest/scoring
+> paths (parquet column reads) is the next step.
 
 ## Install
 

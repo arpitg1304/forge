@@ -243,6 +243,11 @@ class LeRobotV3Reader:
         Returns:
             True if LeRobot v3 markers found.
         """
+        from forge.io import is_remote_uri
+
+        if is_remote_uri(path):
+            return cls._can_read_remote(str(path))
+
         if not path.exists() or not path.is_dir():
             return False
 
@@ -283,6 +288,25 @@ class LeRobotV3Reader:
         return False
 
     @classmethod
+    def _can_read_remote(cls, uri: str) -> bool:
+        """Detect a v3 dataset on a remote ``s3://`` / ``gs://`` source (no download).
+
+        Reads only ``meta/info.json`` and checks ``codebase_version``.
+        """
+        from forge.io.paths import get_filesystem
+
+        try:
+            fs, root = get_filesystem(uri)
+            info_path = f"{root.rstrip('/')}/meta/info.json"
+            if not fs.exists(info_path):
+                return False
+            with fs.open(info_path, "rb") as f:
+                version = str(json.loads(f.read()).get("codebase_version", "")).lstrip("v")
+            return int(version.split(".")[0]) >= 3
+        except Exception:
+            return False
+
+    @classmethod
     def detect_version(cls, path: Path) -> str | None:
         """Detect specific LeRobot version.
 
@@ -314,6 +338,11 @@ class LeRobotV3Reader:
         Returns:
             DatasetInfo with schema and metadata.
         """
+        from forge.io import is_remote_uri
+
+        if is_remote_uri(path):
+            return self._inspect_remote(str(path))
+
         path = Path(path)
         info = DatasetInfo(path=path, format="lerobot-v3")
         info.format_version = self.detect_version(path)
@@ -335,6 +364,29 @@ class LeRobotV3Reader:
 
         return info
 
+    def _inspect_remote(self, uri: str) -> DatasetInfo:
+        """Stream a v3 dataset's metadata from the cloud — no download.
+
+        Reads only ``meta/info.json`` (a few KB) via a range request. info.json
+        carries episode/frame counts, fps, robot, per-camera dims, and the
+        action/observation schema, so the mp4 probe (which needs a local file)
+        is skipped. ``has_language`` is inferred from the tasks table's presence.
+        """
+        from forge.io import DataSource
+
+        src = DataSource(uri)
+        if not src.exists("meta", "info.json"):
+            raise InspectionError(uri, "Missing meta/info.json (required for v3)")
+
+        data = src.read_json("meta", "info.json")
+        info = DatasetInfo(path=uri, format="lerobot-v3")
+        info.format_version = str(data.get("codebase_version", "3.0")).lstrip("v")
+        self._populate_from_info(data, info)
+        info.has_language = src.exists("meta", "tasks.parquet") or src.exists(
+            "meta", "tasks.jsonl"
+        )
+        return info
+
     def _load_info_json(self, path: Path, info: DatasetInfo) -> None:
         """Load metadata from info.json."""
         info_path = path / "meta" / "info.json"
@@ -344,7 +396,17 @@ class LeRobotV3Reader:
         try:
             with open(info_path) as f:
                 data = json.load(f)
+        except json.JSONDecodeError as e:
+            raise InspectionError(path, f"Invalid JSON in info.json: {e}")
+        self._populate_from_info(data, info)
 
+    def _populate_from_info(self, data: dict, info: DatasetInfo) -> None:
+        """Map a parsed info.json dict onto DatasetInfo (cameras, schema, fps…).
+
+        Shared by the local and streaming (remote) inspect paths — info.json
+        alone carries episode/frame counts, fps, robot, and per-camera dims.
+        """
+        if data:
             # Required fields in v3
             info.num_episodes = data.get("total_episodes", 0)
             info.total_frames = data.get("total_frames", 0)
@@ -397,9 +459,6 @@ class LeRobotV3Reader:
 
             # Check for timestamps
             info.has_timestamps = data.get("has_timestamps", True)
-
-        except json.JSONDecodeError as e:
-            raise InspectionError(path, f"Invalid JSON in info.json: {e}")
 
     def _str_to_dtype(self, dtype_str: str) -> Dtype:
         """Convert string dtype to Forge Dtype."""

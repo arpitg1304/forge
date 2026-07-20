@@ -195,8 +195,22 @@ class TestCLICloud:
 
         result = CliRunner().invoke(app, ["inspect", "memory:///cli-bkt/ds"])
         assert result.exit_code == 0, result.output
-        assert "Fetching from cloud storage" in result.output
+        # lerobot-v3 is streamable, so inspect reads metadata over the network
+        # instead of downloading the dataset.
+        assert "streamed metadata" in result.output
         assert "lerobot" in result.output.lower()
+
+    def test_inspect_deep_downloads_cloud_uri(self, memory_fs):
+        # --deep needs the full data, so it falls back to download.
+        from typer.testing import CliRunner
+
+        from forge.cli import app
+
+        self._make_lerobot_v3_in_memory(memory_fs, "/cli-bkt-deep/ds")
+        result = CliRunner().invoke(
+            app, ["inspect", "memory:///cli-bkt-deep/ds", "--deep"]
+        )
+        assert "Fetching from cloud storage" in result.output
 
     def test_convert_rejects_cloud_output(self, memory_fs):
         from typer.testing import CliRunner

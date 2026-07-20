@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Streaming metadata reads for cloud datasets (LeRobot-v3, Zarr).**
+  `forge inspect s3://…` / `gs://…` now reads metadata over the network with
+  **range requests** instead of downloading the whole dataset — inspecting a
+  464 MB cloud LeRobot-v3 dataset fetches ~3 KB (its `info.json`), a ~150,000×
+  reduction in bytes moved, in a fraction of a second. LeRobot-v3 reads
+  `info.json` (which carries episode/frame counts, fps, robot, per-camera dims,
+  and schema); Zarr opens the store natively over fsspec. `--deep` forces a full
+  download for per-episode stats; non-streamable formats and other commands are
+  unchanged (download-to-temp). New `forge.io.DataSource` helper; the readers
+  keep their local paths untouched.
+
 - **Search- and selection-driven curation.** `forge curate` now selects
   episodes three ways — a SQL `--where` predicate, an explicit `--ids` list, or
   a `--from <selection.json>` file — so semantic search and Forge Studio can
