@@ -91,12 +91,20 @@ class ZarrReader:
     def can_read(cls, path: Path) -> bool:
         """Check for Zarr markers: .zarr directory, .zarr.zip file, or .zarray files.
 
+        Handles ``s3://`` / ``gs://`` sources (checked over fsspec) as well as
+        local paths. Zarr reads remote stores natively via range requests.
+
         Args:
-            path: Path to potential Zarr dataset.
+            path: Path or URI to a potential Zarr dataset.
 
         Returns:
             True if Zarr markers found.
         """
+        from forge.io import is_remote_uri
+
+        if is_remote_uri(path):
+            return cls._can_read_remote(str(path))
+
         if not path.exists():
             return False
 
@@ -133,6 +141,33 @@ class ZarrReader:
         return False
 
     @classmethod
+    def _can_read_remote(cls, uri: str) -> bool:
+        """Zarr-marker check for a remote ``s3://`` / ``gs://`` store (no download)."""
+        from forge.io.paths import get_filesystem
+
+        if uri.endswith((".zarr", ".zarr.zip")):
+            return True
+        try:
+            fs, root = get_filesystem(uri)
+            root = root.rstrip("/")
+            for marker in (".zgroup", ".zarray", "zarr.json"):
+                if fs.exists(f"{root}/{marker}"):
+                    return True
+            # nested structure (data/ + meta/)
+            if fs.exists(f"{root}/data") or fs.exists(f"{root}/meta"):
+                return True
+        except Exception:
+            return False
+        return False
+
+    @staticmethod
+    def _store(path):
+        """Return the argument to ``zarr.open``: a URI (streamed) or local path."""
+        from forge.io import is_remote_uri
+
+        return str(path) if is_remote_uri(path) else str(Path(path))
+
+    @classmethod
     def detect_version(cls, path: Path) -> str | None:
         """Detect Zarr format version.
 
@@ -146,7 +181,7 @@ class ZarrReader:
         import zarr
 
         try:
-            root = zarr.open(str(path), mode="r")
+            root = zarr.open(cls._store(path), mode="r")
             # Check for version in attrs
             if hasattr(root, "attrs"):
                 version = root.attrs.get("version", root.attrs.get("format_version"))
@@ -172,12 +207,15 @@ class ZarrReader:
         _check_zarr()
         import zarr
 
-        path = Path(path)
-        info = DatasetInfo(path=path, format="zarr")
+        from forge.io import is_remote_uri
+
+        # Keep the URI as-is for remote sources (Path() would mangle "s3://").
+        info_path = path if is_remote_uri(path) else Path(path)
+        info = DatasetInfo(path=info_path, format="zarr")
         info.format_version = self.detect_version(path)
 
         try:
-            root = zarr.open(str(path), mode="r")
+            root = zarr.open(self._store(path), mode="r")
         except Exception as e:
             raise InspectionError(path, f"Failed to open Zarr store: {e}")
 
@@ -338,8 +376,7 @@ class ZarrReader:
         import numpy as np
         import zarr
 
-        path = Path(path)
-        root = zarr.open(str(path), mode="r")
+        root = zarr.open(self._store(path), mode="r")
 
         # Get episode boundaries
         episode_ends = self._get_episode_ends(root)

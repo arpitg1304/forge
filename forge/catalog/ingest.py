@@ -60,6 +60,26 @@ def _resolve_source(uri: str) -> Path:
     return Path(uri)
 
 
+def _resolve_for_ingest(uri: str):
+    """Resolve for ingest, streaming remote streamable formats instead of downloading.
+
+    Returns a source usable by the readers — the URI itself for a remote
+    ``lerobot-v3``/``zarr`` dataset (metadata + proprio streamed via range
+    reads; no video download), or a local path otherwise.
+    """
+    from forge.formats.registry import FormatRegistry
+    from forge.io import is_remote_uri
+
+    if is_remote_uri(uri):
+        try:
+            fmt = FormatRegistry.detect_format(uri)
+        except Exception:
+            fmt = None
+        if fmt in FormatRegistry.STREAMABLE_FORMATS:
+            return uri
+    return _resolve_source(uri)
+
+
 def _episode_content_hash(episode: Episode, frames: list) -> str:
     """xxh3 hash of an episode's content: proprio stream + shape signature.
 
@@ -245,7 +265,7 @@ def ingest(
             total = 0
             for src in sources:
                 try:
-                    path = _resolve_source(src)
+                    path = _resolve_for_ingest(src)
                     fmt = FormatRegistry.detect_format(path)
                     total += FormatRegistry.get_reader(fmt).inspect(path).num_episodes or 0
                 except Exception:
@@ -284,7 +304,7 @@ def ingest(
     try:
         for src in sources:
             try:
-                path = _resolve_source(src)
+                path = _resolve_for_ingest(src)
                 fmt = FormatRegistry.detect_format(path)
                 reader = FormatRegistry.get_reader(fmt)
                 dataset_info = None

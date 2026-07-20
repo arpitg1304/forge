@@ -17,8 +17,10 @@ from forge.io.paths import (
     is_remote_uri,
     localize,
 )
+from forge.io.source import DataSource
 
 __all__ = [
+    "DataSource",
     "RemoteWriteNotSupportedError",
     "cleanup_localized",
     "get_filesystem",

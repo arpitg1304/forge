@@ -417,24 +417,47 @@ def inspect_cmd(
 
     from forge.inspect import InspectionOptions, Inspector
 
-    # Resolve HuggingFace URLs to local paths
-    try:
-        resolved_path = _resolve_dataset_path(path)
-    except Exception as e:
-        console.print(f"[red]Error downloading dataset:[/red] {e}")
-        raise typer.Exit(1)
+    from forge.io import is_remote_uri
 
-    options = InspectionOptions(
-        sample_episodes=samples,
-        deep_scan=deep,
-    )
-    inspector = Inspector(options)
+    info = None
 
-    try:
-        info = inspector.inspect(resolved_path, format)
-    except ForgeError as e:
-        console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(1)
+    # Streaming inspect for cloud lerobot-v3 / zarr: read metadata over the
+    # network (range reads) instead of downloading the whole dataset. Falls back
+    # to download for --deep, --generate-config, or non-streamable formats.
+    if is_remote_uri(path) and not deep and generate_config is None:
+        from forge.formats.registry import FormatRegistry
+
+        try:
+            detected = format or FormatRegistry.detect_format(path)
+        except Exception:
+            detected = None
+        if detected in FormatRegistry.STREAMABLE_FORMATS:
+            try:
+                info = FormatRegistry.get_reader(detected).inspect(path)
+                console.print("[dim]streamed metadata — no download[/dim]")
+            except ForgeError as e:
+                console.print(f"[red]Error:[/red] {e}")
+                raise typer.Exit(1)
+
+    if info is None:
+        # Resolve HuggingFace URLs / download cloud datasets to local paths
+        try:
+            resolved_path = _resolve_dataset_path(path)
+        except Exception as e:
+            console.print(f"[red]Error downloading dataset:[/red] {e}")
+            raise typer.Exit(1)
+
+        options = InspectionOptions(
+            sample_episodes=samples,
+            deep_scan=deep,
+        )
+        inspector = Inspector(options)
+
+        try:
+            info = inspector.inspect(resolved_path, format)
+        except ForgeError as e:
+            console.print(f"[red]Error:[/red] {e}")
+            raise typer.Exit(1)
 
     if output == "json":
         # Convert to JSON-serializable dict
