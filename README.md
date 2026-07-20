@@ -286,7 +286,7 @@ forge inspect s3://my-bucket/datasets/run_0413
 forge convert gs://lab-data/rosbags ./out --format lerobot-v3
 ```
 
-**Streaming inspect.** For **LeRobot-v3** and **Zarr**, `forge inspect` reads metadata over the network with **range requests** instead of downloading — e.g. inspecting a 464 MB cloud LeRobot dataset fetches ~3 KB (its `info.json`), not the whole thing. Add `--deep` to force a full download when you need per-episode stats.
+**Streaming reads.** For **LeRobot-v3** and **Zarr**, `forge inspect` and `forge ingest` read over the network with **range requests** instead of downloading. Inspecting a 464 MB cloud LeRobot dataset fetches ~3 KB (its `info.json`); **ingesting it — register + quality-score every episode — reads only the proprio parquet columns (~3 MB), never the videos.** `forge inspect --deep` forces a full download when you need per-episode stats; embeddings/video quality still fetch frames.
 
 Auth uses each provider's standard credential chain (AWS env vars / profiles / IAM roles; GCP Application Default Credentials) — Forge never handles credentials itself. Catalogs can be read *and written* in the cloud; per-format conversion **outputs** are local-only for now. Full guide + connectivity troubleshooting: [forge/io/README.md](forge/io/README.md).
 
@@ -336,7 +336,7 @@ Full reference: [docs/cli.md](docs/cli.md). Run `forge <command> --help` for any
 - [x] Cloud storage — `s3://` / `gs://` on every command
 - [x] The catalog — ingest, SQL query, semantic search, dedup, curation, Studio
 - [ ] **Snapshots + export** — freeze a curated selection → LeRobot/RLDS for training
-- [~] **Streaming reads** — `forge inspect` streams LeRobot-v3 / Zarr metadata (range reads, no download); ingest/scoring streaming next
+- [~] **Streaming reads** — `forge inspect` + `forge ingest` stream LeRobot-v3 / Zarr (metadata + proprio via range reads, no video download); frame/embedding streaming next
 - [ ] **Dataset merging & splitting** — combine datasets; stratified train/val/test
 - [ ] **Depth / point-cloud support** · **GR00T writer** · **distributed conversion**
 

@@ -9,16 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Streaming metadata reads for cloud datasets (LeRobot-v3, Zarr).**
-  `forge inspect s3://…` / `gs://…` now reads metadata over the network with
-  **range requests** instead of downloading the whole dataset — inspecting a
-  464 MB cloud LeRobot-v3 dataset fetches ~3 KB (its `info.json`), a ~150,000×
-  reduction in bytes moved, in a fraction of a second. LeRobot-v3 reads
-  `info.json` (which carries episode/frame counts, fps, robot, per-camera dims,
-  and schema); Zarr opens the store natively over fsspec. `--deep` forces a full
-  download for per-episode stats; non-streamable formats and other commands are
-  unchanged (download-to-temp). New `forge.io.DataSource` helper; the readers
-  keep their local paths untouched.
+- **Streaming reads for cloud datasets (LeRobot-v3, Zarr).** `forge inspect`
+  **and `forge ingest`** on `s3://…` / `gs://…` now read over the network with
+  **range requests** instead of downloading the whole dataset.
+  - **Inspect** fetches metadata only — a 464 MB cloud LeRobot-v3 dataset yields
+    a full inspect from ~3 KB (its `info.json`), a ~150,000× reduction, in a
+    fraction of a second.
+  - **Ingest** (register + quality-score) reads only the **proprio parquet
+    columns** (state/action/timestamp) via column/range reads — **never the
+    videos**. Ingesting the same 464 MB dataset streams ~3 MB and produces
+    identical episodes and quality scores. Content hashes are identical whether
+    an episode is streamed or downloaded, so cross-path re-ingest is idempotent.
+  - LeRobot-v3 gets a proprio-only streaming `read_episodes`; Zarr streams via
+    its native fsspec store. `forge inspect --deep`, embeddings, and video
+    quality still fetch frames; other formats/commands are unchanged
+    (download-to-temp). New `forge.io.DataSource` helper; readers keep their
+    local paths untouched.
 
 - **Search- and selection-driven curation.** `forge curate` now selects
   episodes three ways — a SQL `--where` predicate, an explicit `--ids` list, or

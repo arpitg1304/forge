@@ -193,3 +193,86 @@ class TestByteBudgetS3:
         assert info.num_episodes == 42
         # streamed: fetched only info.json-scale bytes, nowhere near the 8 MB payload
         assert fetched["n"] < 1_000_000, f"expected a streaming read, got {fetched['n']} bytes"
+
+
+def _write_lerobot_v3(fs, root: str, *, episodes=2, frames=10) -> None:
+    """Write a minimal streamable v3 dataset (info.json + one data parquet)."""
+    import io
+
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    info = dict(_lerobot_v3_info())
+    info["total_episodes"] = episodes
+    info["total_frames"] = episodes * frames
+    with fs.open(f"{root}/meta/info.json", "wb") as f:
+        f.write(json.dumps(info).encode())
+
+    n = episodes * frames
+    rng = np.random.RandomState(0)
+    tbl = pa.table(
+        {
+            "episode_index": [e for e in range(episodes) for _ in range(frames)],
+            "index": list(range(n)),
+            "timestamp": [float(i % frames) / 10 for i in range(n)],
+            "observation.state": [rng.randn(7).tolist() for _ in range(n)],
+            "action": [rng.randn(7).tolist() for _ in range(n)],
+        }
+    )
+    buf = io.BytesIO()
+    pq.write_table(tbl, buf)
+    with fs.open(f"{root}/data/chunk-000/file-000.parquet", "wb") as f:
+        f.write(buf.getvalue())
+
+
+class TestStreamingIngest:
+    def test_ingest_streams_over_memory(self, memory_fs, tmp_path):
+        pytest.importorskip("duckdb")
+        from forge.catalog import Catalog
+        from forge.catalog.ingest import ingest as ingest_datasets
+
+        _write_lerobot_v3(memory_fs, "/ds", episodes=3, frames=8)
+        cat = Catalog.init(str(tmp_path / "cat"))
+
+        before = len(_TEMP_ROOTS)
+        stats = ingest_datasets(["memory:///ds"], cat)
+        assert stats.ingested == 3 and stats.failed == 0
+        assert len(_TEMP_ROOTS) == before  # streamed — nothing downloaded
+        # registered + quality-scored, all from parquet proprio columns
+        assert cat.sql("SELECT count(*) n FROM episodes").to_pylist()[0]["n"] == 3
+        scored = cat.sql(
+            "SELECT count(*) n FROM v_latest_quality WHERE overall_score IS NOT NULL"
+        ).to_pylist()[0]["n"]
+        assert scored == 3
+
+    def test_ingest_byte_budget_ignores_video(self, moto_s3, tmp_path):
+        pytest.importorskip("duckdb")
+        import s3fs
+        from s3fs.core import S3File
+
+        from forge.catalog import Catalog
+        from forge.catalog.ingest import ingest as ingest_datasets
+
+        fs = s3fs.S3FileSystem()
+        fs.mkdir("ingest-bucket")
+        _write_lerobot_v3(fs, "ingest-bucket/ds", episodes=2, frames=10)
+        # a big "video" payload the proprio ingest must not read
+        with fs.open("ingest-bucket/ds/videos/cam/big.mp4", "wb") as f:
+            f.write(b"\0" * (8 * 1024 * 1024))
+
+        fetched = {"n": 0}
+        orig = S3File._fetch_range
+
+        def counting(self, start, end):
+            fetched["n"] += end - start
+            return orig(self, start, end)
+
+        S3File._fetch_range = counting
+        try:
+            cat = Catalog.init(str(tmp_path / "cat"))
+            stats = ingest_datasets(["s3://ingest-bucket/ds"], cat)
+        finally:
+            S3File._fetch_range = orig
+
+        assert stats.ingested == 2
+        assert fetched["n"] < 2_000_000, f"ingest should stream proprio, got {fetched['n']} bytes"

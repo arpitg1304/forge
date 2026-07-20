@@ -754,6 +754,12 @@ class LeRobotV3Reader:
         _check_pyarrow()
         import pyarrow.parquet as pq
 
+        from forge.io import is_remote_uri
+
+        if is_remote_uri(path):
+            yield from self._read_episodes_remote(str(path))
+            return
+
         path = Path(path)
 
         # V3 uses data/train/ structure
@@ -826,6 +832,129 @@ class LeRobotV3Reader:
                 )
 
                 yield self._load_episode(path, pq_file, episode_id, language)
+
+    # ── Streaming (remote) episode reads ─────────────────────────────────
+    # Reads only the proprio columns (state/action/timestamp) from the data
+    # parquet via range/column reads — never touches the mp4 videos. This powers
+    # streaming ingest + quality (content hash + the proprio metrics) on cloud
+    # datasets without a full download. Embeddings/video still need the frames,
+    # so those paths localize; this yields proprio-only episodes.
+
+    _PROPRIO_COLUMNS = (
+        "episode_index", "index", "frame_index", "timestamp",
+        "observation.state", "action",
+    )
+
+    def _read_episodes_remote(self, uri: str) -> Iterator[Episode]:
+        import numpy as np
+
+        from forge.io import DataSource
+
+        src = DataSource(uri)
+        info = src.read_json("meta", "info.json") if src.exists("meta", "info.json") else {}
+        fps = info.get("fps")
+        tasks = self._stream_all_tasks(src)
+        episode_meta = self._stream_episode_metadata(src)
+
+        files = (
+            src.glob("data", "train", "**", "*.parquet")
+            or src.glob("data", "**", "*.parquet")
+            or src.glob("data", "*.parquet")
+        )
+        yielded: set[int] = set()
+        for pq_file in sorted(files):
+            names = set(self.__parquet_names(src, pq_file))
+            cols = [c for c in self._PROPRIO_COLUMNS if c in names]
+            if "episode_index" not in cols:
+                continue
+            df = src.read_parquet(pq_file, columns=cols).to_pandas()
+            for episode_idx in sorted(df["episode_index"].unique()):
+                episode_idx = int(episode_idx)
+                if episode_idx in yielded:
+                    continue
+                yielded.add(episode_idx)
+                ep_df = df[df["episode_index"] == episode_idx]
+                language = self._episode_language(
+                    episode_meta.get(episode_idx) if episode_meta else None, tasks
+                )
+                yield self._proprio_episode(ep_df, episode_idx, fps, language, np)
+
+    @staticmethod
+    def __parquet_names(src, pq_file) -> list[str]:
+        try:
+            return list(src.parquet_schema(pq_file).names)
+        except Exception:
+            return list(LeRobotV3Reader._PROPRIO_COLUMNS)
+
+    def _proprio_episode(self, ep_df, episode_idx, fps, language, np) -> Episode:
+        """Build a proprio-only Episode (no images) from parquet columns."""
+
+        def _stack(col):
+            if col not in ep_df.columns:
+                return None
+            vals = ep_df[col].to_list()
+            return np.asarray(vals, dtype=np.float64) if len(vals) else None
+
+        states = _stack("observation.state")
+        actions = _stack("action")
+        timestamps = (
+            ep_df["timestamp"].to_numpy() if "timestamp" in ep_df.columns else None
+        )
+        n = len(ep_df)
+
+        def loader():
+            for i in range(n):
+                yield Frame(
+                    index=i,
+                    state=states[i] if states is not None else None,
+                    action=actions[i] if actions is not None else None,
+                    timestamp=float(timestamps[i]) if timestamps is not None else None,
+                )
+
+        # Note: state_dim/action_dim are left None to match the local reader,
+        # so an episode's content_hash is identical whether streamed or
+        # downloaded (the hash's shape signature uses episode.state_dim). Ingest
+        # infers the dims from the frames for the episodes table regardless.
+        return Episode(
+            episode_id=f"episode_{episode_idx:06d}",
+            language_instruction=language,
+            fps=fps,
+            metadata={"num_frames": n},
+            _frame_loader=loader,
+        )
+
+    def _stream_all_tasks(self, src) -> list[str]:
+        try:
+            if src.exists("meta", "tasks.parquet"):
+                df = src.read_parquet(src.path("meta", "tasks.parquet")).to_pandas()
+                col = "task" if "task" in df.columns else df.columns[-1]
+                return [str(t) for t in df[col].to_list()]
+            if src.exists("meta", "tasks.jsonl"):
+                return [
+                    json.loads(line).get("task", "")
+                    for line in src.read_text("meta", "tasks.jsonl").splitlines()
+                    if line.strip()
+                ]
+        except Exception:
+            pass
+        return []
+
+    def _stream_episode_metadata(self, src) -> dict[int, dict]:
+        meta: dict[int, dict] = {}
+        try:
+            for f in src.glob("meta", "episodes", "**", "*.parquet"):
+                df = src.read_parquet(f).to_pandas()
+                if "episode_index" not in df.columns:
+                    continue
+                for rec in df.to_dict("records"):
+                    meta[int(rec["episode_index"])] = rec
+            if not meta and src.exists("meta", "episodes.jsonl"):
+                for i, line in enumerate(src.read_text("meta", "episodes.jsonl").splitlines()):
+                    if line.strip():
+                        meta[i] = json.loads(line)
+        except Exception:
+            pass
+        return meta
 
     def _episode_language(self, meta: dict | None, tasks: list[str]) -> str | None:
         """Resolve one episode's language instruction from its metadata.
