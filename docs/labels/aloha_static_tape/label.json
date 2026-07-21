@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "dataset": {
+    "hf_id": "lerobot/aloha_static_tape",
+    "format_name": "LeRobot v3",
+    "registry_id": "aloha_static_tape"
+  },
+  "scoring": {
+    "scored_at": "2026-07-21",
+    "forge_version": "0.1.0",
+    "episodes_total": 50,
+    "episodes_scored": 50,
+    "sampled": false,
+    "seed": 42
+  },
+  "quality": {
+    "score": 8.1,
+    "ci95": null,
+    "histogram": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      15,
+      35,
+      0
+    ]
+  },
+  "facts": {
+    "mean_episode_seconds": 14.0,
+    "total_hours": 0.19,
+    "total_frames": 35000,
+    "fps": 50.0,
+    "embodiment": "ALOHA",
+    "cameras": {
+      "count": 4,
+      "summary": "4 (480×640)"
+    },
+    "action_space": "14-dim",
+    "metrics": {
+      "dead_actions_pct": 0.1,
+      "static_frames_pct": 0.0,
+      "gripper_chatter_per_episode": 4.0,
+      "timestamp_jitter": "low"
+    }
+  },
+  "flags": {
+    "counts": {
+      "saturated": 46
+    },
+    "closer": "Occasionally pressed against the limits."
+  },
+  "footer": {
+    "license": "MIT"
+  }
+}

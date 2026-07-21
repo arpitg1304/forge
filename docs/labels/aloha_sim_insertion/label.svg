@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="488.74" viewBox="0 0 360 488.74" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" shape-rendering="crispEdges" text-rendering="geometricPrecision">
+<rect x="0" y="0" width="360" height="488.74" fill="#ffffff"/>
+<rect x="1.25" y="1.25" width="357.5" height="486.24" fill="none" stroke="#0b0b0b" stroke-width="2.5"/>
+<text x="14.5" y="37.66" font-size="34" font-weight="900" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" fill="#0b0b0b" text-anchor="start" letter-spacing="-1.5">Dataset facts</text>
+<text x="14.5" y="59.09" font-size="12.0" font-weight="400" font-family="'SFMono-Regular',ui-monospace,'Cascadia Mono',Consolas,monospace" fill="#6b6a66" text-anchor="start">lerobot/aloha_sim_insertion_human · LeRobot v3</text>
+<rect x="14.5" y="67.49" width="331.0" height="9" fill="#0b0b0b"/>
+<text x="14.5" y="90.41" font-size="14" font-weight="400" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" fill="#0b0b0b" text-anchor="start">Serving size</text>
+<text x="345.5" y="90.41" font-size="14" font-weight="700" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" fill="#0b0b0b" text-anchor="end">1 episode (~10 s)</text>
+<rect x="14.5" y="96.49" width="331.0" height="1" fill="#0b0b0b"/>
+<text x="14.5" y="111.41" font-size="14" font-weight="400" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" fill="#0b0b0b" text-anchor="start">Servings per dataset</text>
+<text x="345.5" y="111.41" font-size="14" font-weight="700" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" fill="#0b0b0b" text-anchor="end">50</text>
+<rect x="14.5" y="117.49" width="331.0" height="5" fill="#0b0b0b"/>
+<text x="14.5" y="150.49" font-size="16" font-weight="900" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" fill="#0b0b0b" text-anchor="start">Quality score</text>
+<text x="345.5" y="150.49" font-size="13" font-weight="400" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" fill="#6b6a66" text-anchor="end"> / 10</text>
+<text x="312.35" y="150.49" font-size="30" font-weight="900" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" fill="#0b0b0b" text-anchor="end" letter-spacing="-1">8.2</text>
+<rect x="247.6" y="183.91" width="31.3" height="6.59" fill="#0b0b0b"/>
+<rect x="280.9" y="160.49" width="31.3" height="30.0" fill="#0b0b0b"/>
+<text x="345.5" y="200.89" font-size="10.5" font-weight="400" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" fill="#6b6a66" text-anchor="end">episode score distribution 0–10 · scored on all 50 episodes</text>
+<rect x="14.5" y="207.99" width="331.0" height="5" fill="#0b0b0b"/>
+<text x="14.5" y="226.91" font-size="14" font-weight="700" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" fill="#0b0b0b" text-anchor="start">Total hours</text>
+<text x="345.5" y="226.91" font-size="14" font-weight="400" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" fill="#0b0b0b" text-anchor="end">0.14 h</text>
+<rect x="14.5" y="232.99" width="331.0" height="1" fill="#0b0b0b"/>
+<text x="30.5" y="247.91" font-size="14" font-weight="400" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" fill="#0b0b0b" text-anchor="start">Frames</text>
+<text x="345.5" y="247.91" font-size="14" font-weight="400" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" fill="#0b0b0b" text-anchor="end">25k @ 50 fps</text>
+<rect x="14.5" y="253.99" width="331.0" height="1" fill="#0b0b0b"/>
+<text x="14.5" y="268.91" font-size="14" font-weight="700" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" fill="#0b0b0b" text-anchor="start">Embodiment</text>
+<text x="345.5" y="268.91" font-size="14" font-weight="400" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" fill="#0b0b0b" text-anchor="end">ALOHA</text>
+<rect x="14.5" y="274.99" width="331.0" height="1" fill="#0b0b0b"/>
+<text x="30.5" y="289.91" font-size="14" font-weight="400" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" fill="#0b0b0b" text-anchor="start">Cameras</text>
+<text x="345.5" y="289.91" font-size="14" font-weight="400" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" fill="#0b0b0b" text-anchor="end">1 (top, 480×640)</text>
+<rect x="14.5" y="295.99" width="331.0" height="1" fill="#0b0b0b"/>
+<text x="30.5" y="310.91" font-size="14" font-weight="400" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" fill="#0b0b0b" text-anchor="start">Action space</text>
+<text x="345.5" y="310.91" font-size="14" font-weight="400" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" fill="#0b0b0b" text-anchor="end">14-dim</text>
+<rect x="14.5" y="316.99" width="331.0" height="1" fill="#0b0b0b"/>
+<text x="14.5" y="331.91" font-size="14" font-weight="700" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" fill="#0b0b0b" text-anchor="start">Dead actions</text>
+<text x="345.5" y="331.91" font-size="14" font-weight="700" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" fill="#0b0b0b" text-anchor="end">0.2%</text>
+<rect x="14.5" y="337.99" width="331.0" height="1" fill="#0b0b0b"/>
+<text x="14.5" y="352.91" font-size="14" font-weight="700" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" fill="#0b0b0b" text-anchor="start">Static frames</text>
+<text x="345.5" y="352.91" font-size="14" font-weight="700" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" fill="#0b0b0b" text-anchor="end">0%</text>
+<rect x="14.5" y="358.99" width="331.0" height="1" fill="#0b0b0b"/>
+<text x="14.5" y="373.91" font-size="14" font-weight="700" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" fill="#0b0b0b" text-anchor="start">Gripper chatter</text>
+<text x="345.5" y="373.91" font-size="14" font-weight="700" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" fill="#0b0b0b" text-anchor="end">2.04 / episode</text>
+<rect x="14.5" y="379.99" width="331.0" height="1" fill="#0b0b0b"/>
+<text x="14.5" y="394.91" font-size="14" font-weight="700" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" fill="#0b0b0b" text-anchor="start">Timestamp jitter</text>
+<text x="345.5" y="394.91" font-size="14" font-weight="700" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" fill="#0b0b0b" text-anchor="end">low</text>
+<rect x="14.5" y="400.99" width="331.0" height="5" fill="#0b0b0b"/>
+<text x="14.5" y="421.99" font-size="12.5" font-weight="400" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" fill="#0b0b0b" text-anchor="start"><tspan font-weight="700" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" fill="#0b0b0b">Contains:</tspan><tspan font-weight="400" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" fill="#0b0b0b"> 46</tspan><tspan font-weight="400" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" fill="#0b0b0b"> episodes</tspan><tspan font-weight="400" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" fill="#0b0b0b"> flagged</tspan><tspan font-weight="400" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" fill="#0b0b0b"> saturated.</tspan></text>
+<text x="14.5" y="440.12" font-size="12.5" font-weight="400" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" fill="#0b0b0b" text-anchor="start"><tspan font-weight="400" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" fill="#0b0b0b">Occasionally</tspan><tspan font-weight="400" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" fill="#0b0b0b"> pressed</tspan><tspan font-weight="400" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" fill="#0b0b0b"> against</tspan><tspan font-weight="400" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" fill="#0b0b0b"> the</tspan><tspan font-weight="400" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" fill="#0b0b0b"> limits.</tspan></text>
+<rect x="14.5" y="458.24" width="331.0" height="1" fill="#0b0b0b"/>
+<text x="14.5" y="474.04" font-size="11" font-weight="400" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" fill="#6b6a66" text-anchor="start">MIT license · scored 2026-07-21</text>
+<text x="345.5" y="474.04" font-size="11" font-weight="400" font-family="'SFMono-Regular',ui-monospace,'Cascadia Mono',Consolas,monospace" fill="#0b0b0b" text-anchor="end">⚒ forge quality v0.1</text>
+</svg>

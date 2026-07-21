@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "dataset": {
+    "hf_id": "lerobot/droid_100",
+    "format_name": "LeRobot v3",
+    "registry_id": "droid_100"
+  },
+  "scoring": {
+    "scored_at": "2026-07-21",
+    "forge_version": "0.1.0",
+    "episodes_total": 100,
+    "episodes_scored": 100,
+    "sampled": false,
+    "seed": 42
+  },
+  "quality": {
+    "score": 8.3,
+    "ci95": null,
+    "histogram": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      23,
+      77,
+      0
+    ]
+  },
+  "facts": {
+    "mean_episode_seconds": 21.5,
+    "total_hours": 0.6,
+    "total_frames": 32212,
+    "fps": 15.0,
+    "embodiment": "Franka",
+    "cameras": {
+      "count": 3,
+      "summary": "3 (180×320)"
+    },
+    "action_space": "7-dim",
+    "metrics": {
+      "dead_actions_pct": 11.5,
+      "static_frames_pct": 0.2,
+      "gripper_chatter_per_episode": 3.86,
+      "timestamp_jitter": "low"
+    }
+  },
+  "flags": {
+    "counts": {
+      "dead_actions": 39,
+      "low_entropy": 1,
+      "jerky": 1
+    },
+    "closer": "Some frames were resting when the camera rolled."
+  },
+  "footer": {
+    "license": "CC-BY-4.0"
+  }
+}
