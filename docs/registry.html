@@ -316,6 +316,7 @@
   .badge-demo { color: var(--orange); background: var(--orange-dim); border-color: rgba(251,191,36,0.2); }
   .badge-tag { color: var(--text-secondary); background: rgba(94,110,138,0.1); border-color: rgba(94,110,138,0.15); }
   .badge-scale { color: var(--teal); background: var(--teal-dim); border-color: rgba(45,212,191,0.2); }
+  .badge-gated { color: var(--rose); background: var(--rose-dim); border-color: rgba(251,113,133,0.25); }
 
   .chevron {
     color: var(--text-muted);
@@ -521,7 +522,7 @@
   <a class="facts-link" href="labels.html">⚒ Dataset facts labels &rarr;</a>
   <div class="stats-bar">
     <div class="stat-card">
-      <div class="num">23</div>
+      <div class="num">32</div>
       <div class="label">Datasets</div>
     </div>
     <div class="stat-card">
@@ -529,15 +530,15 @@
       <div class="label">Demo-Ready</div>
     </div>
     <div class="stat-card">
-      <div class="num">3.6M</div>
+      <div class="num">5.0M</div>
       <div class="label">Total Episodes</div>
     </div>
     <div class="stat-card">
-      <div class="num">5</div>
+      <div class="num">6</div>
       <div class="label">Formats</div>
     </div>
     <div class="stat-card">
-      <div class="num">12</div>
+      <div class="num">16</div>
       <div class="label">Robots</div>
     </div>
   </div>
@@ -557,6 +558,7 @@
     <option value="lerobot-v2">lerobot-v2</option>
     <option value="other">other</option>
     <option value="rlds">rlds</option>
+    <option value="zarr">zarr</option>
     
   </select>
   <select class="filter-select" id="tagFilter" onchange="filterCards()">
@@ -577,29 +579,39 @@
   <select class="filter-select" id="embodimentFilter" onchange="filterCards()">
     <option value="">All Robots</option>
     <option value="agibot_g1">agibot_g1</option>
+    <option value="agilex">agilex</option>
     <option value="aloha">aloha</option>
+    <option value="dexterous_hand">dexterous_hand</option>
     <option value="flexiv">flexiv</option>
     <option value="franka">franka</option>
     <option value="google_robot">google_robot</option>
+    <option value="handheld_gripper">handheld_gripper</option>
     <option value="jaco">jaco</option>
     <option value="kuka">kuka</option>
     <option value="sawyer">sawyer</option>
     <option value="simulated">simulated</option>
+    <option value="tien_kung">tien_kung</option>
     <option value="ur5">ur5</option>
     <option value="widowx">widowx</option>
     <option value="xarm">xarm</option>
     
   </select>
+  <select class="filter-select" id="accessFilter" onchange="filterCards()">
+    <option value="">All Access</option>
+    <option value="open">Open (no restrictions)</option>
+    <option value="registration_required">Registration required</option>
+    <option value="non_commercial">Non-commercial</option>
+  </select>
   <select class="filter-select" id="demoFilter" onchange="filterCards()">
     <option value="">All Datasets</option>
     <option value="demo">Demo-Suitable Only</option>
   </select>
-  <span class="result-count" id="resultCount">23 datasets</span>
+  <span class="result-count" id="resultCount">32 datasets</span>
 </div>
 
 <div class="grid" id="grid">
 
-<div class="card" data-id="open_x_embodiment" data-format="rlds" data-tags="manipulation,real_world,multi_task,large_scale,language_conditioned" data-demo="false" data-embodiment="google_robot,franka,widowx,jaco,sawyer,ur5,kuka" data-search="open_x_embodiment Open X-Embodiment Aggregate dataset spanning 60+ constituent datasets, 22 robot platforms, and 527 manipulation skills. The largest open robotics dataset collection. google_robot franka widowx jaco sawyer ur5 kuka manipulation real_world multi_task large_scale language_conditioned pick_place push pour wipe drawer multi_task rlds">
+<div class="card" data-id="open_x_embodiment" data-format="rlds" data-tags="manipulation,real_world,multi_task,large_scale,language_conditioned" data-demo="false" data-embodiment="google_robot,franka,widowx,jaco,sawyer,ur5,kuka" data-access="open" data-search="open_x_embodiment Open X-Embodiment Aggregate dataset spanning 60+ constituent datasets, 22 robot platforms, and 527 manipulation skills. The largest open robotics dataset collection. google_robot franka widowx jaco sawyer ur5 kuka manipulation real_world multi_task large_scale language_conditioned pick_place push pour wipe drawer multi_task rlds">
   <div class="card-header" onclick="toggleCard(this)">
     <div style="flex:1;min-width:0;">
       <div class="card-title-row">
@@ -613,6 +625,8 @@
         
         
           <span class="badge badge-scale">large</span>
+        
+        
         
       </div>
     </div>
@@ -727,7 +741,7 @@
   </div>
 </div>
 
-<div class="card" data-id="droid" data-format="rlds" data-tags="manipulation,real_world,multi_task,large_scale" data-demo="false" data-embodiment="franka" data-search="droid DROID Large-scale in-the-wild manipulation dataset with 76K+ episodes across 564 scenes and 52 buildings. Multi-camera Franka teleoperation. franka manipulation real_world multi_task large_scale pick_place push wipe drawer multi_task rlds">
+<div class="card" data-id="droid" data-format="rlds" data-tags="manipulation,real_world,multi_task,large_scale" data-demo="false" data-embodiment="franka" data-access="open" data-search="droid DROID Large-scale in-the-wild manipulation dataset with 76K+ episodes across 564 scenes and 52 buildings. Multi-camera Franka teleoperation. franka manipulation real_world multi_task large_scale pick_place push wipe drawer multi_task rlds">
   <div class="card-header" onclick="toggleCard(this)">
     <div style="flex:1;min-width:0;">
       <div class="card-title-row">
@@ -741,6 +755,8 @@
         
         
           <span class="badge badge-scale">large</span>
+        
+        
         
       </div>
     </div>
@@ -860,7 +876,7 @@
   </div>
 </div>
 
-<div class="card" data-id="bridge_v2" data-format="rlds" data-tags="manipulation,real_world,multi_task,large_scale" data-demo="false" data-embodiment="widowx" data-search="bridge_v2 Bridge V2 Large-scale WidowX tabletop manipulation dataset with 53K+ episodes across 24 environments and 13 skills. widowx manipulation real_world multi_task large_scale pick_place push wipe drawer rlds">
+<div class="card" data-id="bridge_v2" data-format="rlds" data-tags="manipulation,real_world,multi_task,large_scale" data-demo="false" data-embodiment="widowx" data-access="open" data-search="bridge_v2 Bridge V2 Large-scale WidowX tabletop manipulation dataset with 53K+ episodes across 24 environments and 13 skills. widowx manipulation real_world multi_task large_scale pick_place push wipe drawer rlds">
   <div class="card-header" onclick="toggleCard(this)">
     <div style="flex:1;min-width:0;">
       <div class="card-title-row">
@@ -874,6 +890,8 @@
         
         
           <span class="badge badge-scale">large</span>
+        
+        
         
       </div>
     </div>
@@ -993,7 +1011,7 @@
   </div>
 </div>
 
-<div class="card" data-id="roboset" data-format="rlds" data-tags="manipulation,real_world,multi_task" data-demo="false" data-embodiment="franka" data-search="roboset RoboSet Franka multi-task dataset with 12 skills across 38 kitchen tasks. Includes teleoperated, kinesthetic, and heuristic demonstrations. franka manipulation real_world multi_task pick_place pour wipe multi_task rlds">
+<div class="card" data-id="roboset" data-format="rlds" data-tags="manipulation,real_world,multi_task" data-demo="false" data-embodiment="franka" data-access="open" data-search="roboset RoboSet Franka multi-task dataset with 12 skills across 38 kitchen tasks. Includes teleoperated, kinesthetic, and heuristic demonstrations. franka manipulation real_world multi_task pick_place pour wipe multi_task rlds">
   <div class="card-header" onclick="toggleCard(this)">
     <div style="flex:1;min-width:0;">
       <div class="card-title-row">
@@ -1007,6 +1025,8 @@
         
         
           <span class="badge badge-scale">large</span>
+        
+        
         
       </div>
     </div>
@@ -1121,7 +1141,7 @@
   </div>
 </div>
 
-<div class="card" data-id="aloha_sim_transfer_cube" data-format="lerobot" data-tags="manipulation,bi_manual,simulation,single_task" data-demo="true" data-embodiment="aloha" data-search="aloha_sim_transfer_cube ALOHA Sim Transfer Cube Simulated bimanual cube transfer task with 50 human-collected episodes. Ideal for quick ALOHA experiments. aloha manipulation bi_manual simulation single_task pick_place lerobot">
+<div class="card" data-id="aloha_sim_transfer_cube" data-format="lerobot" data-tags="manipulation,bi_manual,simulation,single_task" data-demo="true" data-embodiment="aloha" data-access="open" data-search="aloha_sim_transfer_cube ALOHA Sim Transfer Cube Simulated bimanual cube transfer task with 50 human-collected episodes. Ideal for quick ALOHA experiments. aloha manipulation bi_manual simulation single_task pick_place lerobot">
   <div class="card-header" onclick="toggleCard(this)">
     <div style="flex:1;min-width:0;">
       <div class="card-title-row">
@@ -1135,6 +1155,8 @@
         <span class="badge badge-demo">demo</span>
         
           
+        
+        
         
       </div>
     </div>
@@ -1248,7 +1270,7 @@
   </div>
 </div>
 
-<div class="card" data-id="aloha_sim_insertion" data-format="lerobot" data-tags="manipulation,bi_manual,simulation,single_task" data-demo="true" data-embodiment="aloha" data-search="aloha_sim_insertion ALOHA Sim Insertion Simulated bimanual peg insertion task with 50 human-collected episodes. aloha manipulation bi_manual simulation single_task insertion lerobot">
+<div class="card" data-id="aloha_sim_insertion" data-format="lerobot" data-tags="manipulation,bi_manual,simulation,single_task" data-demo="true" data-embodiment="aloha" data-access="open" data-search="aloha_sim_insertion ALOHA Sim Insertion Simulated bimanual peg insertion task with 50 human-collected episodes. aloha manipulation bi_manual simulation single_task insertion lerobot">
   <div class="card-header" onclick="toggleCard(this)">
     <div style="flex:1;min-width:0;">
       <div class="card-title-row">
@@ -1262,6 +1284,8 @@
         <span class="badge badge-demo">demo</span>
         
           
+        
+        
         
       </div>
     </div>
@@ -1375,7 +1399,7 @@
   </div>
 </div>
 
-<div class="card" data-id="aloha_static_tape" data-format="lerobot" data-tags="manipulation,bi_manual,real_world,single_task" data-demo="true" data-embodiment="aloha" data-search="aloha_static_tape ALOHA Static Tape Real bimanual tape dispensing task with 50 teleoperated episodes on static ALOHA. aloha manipulation bi_manual real_world single_task manipulation lerobot">
+<div class="card" data-id="aloha_static_tape" data-format="lerobot" data-tags="manipulation,bi_manual,real_world,single_task" data-demo="true" data-embodiment="aloha" data-access="open" data-search="aloha_static_tape ALOHA Static Tape Real bimanual tape dispensing task with 50 teleoperated episodes on static ALOHA. aloha manipulation bi_manual real_world single_task manipulation lerobot">
   <div class="card-header" onclick="toggleCard(this)">
     <div style="flex:1;min-width:0;">
       <div class="card-title-row">
@@ -1389,6 +1413,8 @@
         <span class="badge badge-demo">demo</span>
         
           
+        
+        
         
       </div>
     </div>
@@ -1502,7 +1528,7 @@
   </div>
 </div>
 
-<div class="card" data-id="aloha_mobile_cabinet" data-format="lerobot" data-tags="manipulation,bi_manual,mobile_manipulation,real_world,single_task" data-demo="true" data-embodiment="aloha" data-search="aloha_mobile_cabinet ALOHA Mobile Cabinet Real mobile bimanual cabinet manipulation with 85 episodes on Mobile ALOHA. aloha manipulation bi_manual mobile_manipulation real_world single_task drawer manipulation lerobot">
+<div class="card" data-id="aloha_mobile_cabinet" data-format="lerobot" data-tags="manipulation,bi_manual,mobile_manipulation,real_world,single_task" data-demo="true" data-embodiment="aloha" data-access="open" data-search="aloha_mobile_cabinet ALOHA Mobile Cabinet Real mobile bimanual cabinet manipulation with 85 episodes on Mobile ALOHA. aloha manipulation bi_manual mobile_manipulation real_world single_task drawer manipulation lerobot">
   <div class="card-header" onclick="toggleCard(this)">
     <div style="flex:1;min-width:0;">
       <div class="card-title-row">
@@ -1516,6 +1542,8 @@
         <span class="badge badge-demo">demo</span>
         
           
+        
+        
         
       </div>
     </div>
@@ -1629,7 +1657,7 @@
   </div>
 </div>
 
-<div class="card" data-id="agibot_world_alpha" data-format="lerobot-v2" data-tags="manipulation,bi_manual,humanoid,real_world,multi_task,large_scale" data-demo="false" data-embodiment="agibot_g1" data-search="agibot_world_alpha AgiBot World Alpha Large-scale dual-arm humanoid manipulation dataset with 92K+ trajectories across 217 tasks and 87 skills. agibot_g1 manipulation bi_manual humanoid real_world multi_task large_scale pick_place pour multi_task lerobot-v2">
+<div class="card" data-id="agibot_world_alpha" data-format="lerobot-v2" data-tags="manipulation,bi_manual,humanoid,real_world,multi_task,large_scale" data-demo="false" data-embodiment="agibot_g1" data-access="open" data-search="agibot_world_alpha AgiBot World Alpha Large-scale dual-arm humanoid manipulation dataset with 92K+ trajectories across 217 tasks and 87 skills. agibot_g1 manipulation bi_manual humanoid real_world multi_task large_scale pick_place pour multi_task lerobot-v2">
   <div class="card-header" onclick="toggleCard(this)">
     <div style="flex:1;min-width:0;">
       <div class="card-title-row">
@@ -1643,6 +1671,8 @@
         
         
           <span class="badge badge-scale">large</span>
+        
+        
         
       </div>
     </div>
@@ -1753,7 +1783,7 @@
   </div>
 </div>
 
-<div class="card" data-id="rt1_fractal" data-format="rlds" data-tags="manipulation,real_world,multi_task,large_scale" data-demo="false" data-embodiment="google_robot" data-search="rt1_fractal RT-1 / Fractal Google Robot tabletop manipulation dataset with 87K+ episodes, used to train RT-1. 17 object categories. google_robot manipulation real_world multi_task large_scale pick_place push rlds">
+<div class="card" data-id="rt1_fractal" data-format="rlds" data-tags="manipulation,real_world,multi_task,large_scale" data-demo="false" data-embodiment="google_robot" data-access="open" data-search="rt1_fractal RT-1 / Fractal Google Robot tabletop manipulation dataset with 87K+ episodes, used to train RT-1. 17 object categories. google_robot manipulation real_world multi_task large_scale pick_place push rlds">
   <div class="card-header" onclick="toggleCard(this)">
     <div style="flex:1;min-width:0;">
       <div class="card-title-row">
@@ -1767,6 +1797,8 @@
         
         
           <span class="badge badge-scale">large</span>
+        
+        
         
       </div>
     </div>
@@ -1872,7 +1904,7 @@
   </div>
 </div>
 
-<div class="card" data-id="rh20t" data-format="other" data-tags="manipulation,contact_rich,real_world,multi_task,large_scale" data-demo="false" data-embodiment="franka,ur5,kuka,flexiv" data-search="rh20t RH20T Contact-rich manipulation dataset with 110K+ episodes across 4 robots and 147 skills. Includes force/torque and audio. franka ur5 kuka flexiv manipulation contact_rich real_world multi_task large_scale pick_place manipulation multi_task other">
+<div class="card" data-id="rh20t" data-format="other" data-tags="manipulation,contact_rich,real_world,multi_task,large_scale" data-demo="false" data-embodiment="franka,ur5,kuka,flexiv" data-access="open" data-search="rh20t RH20T Contact-rich manipulation dataset with 110K+ episodes across 4 robots and 147 skills. Includes force/torque and audio. franka ur5 kuka flexiv manipulation contact_rich real_world multi_task large_scale pick_place manipulation multi_task other">
   <div class="card-header" onclick="toggleCard(this)">
     <div style="flex:1;min-width:0;">
       <div class="card-title-row">
@@ -1886,6 +1918,8 @@
         
         
           <span class="badge badge-scale">large</span>
+        
+        
         
       </div>
     </div>
@@ -1991,7 +2025,7 @@
   </div>
 </div>
 
-<div class="card" data-id="libero" data-format="hdf5" data-tags="manipulation,simulation,multi_task" data-demo="false" data-embodiment="franka" data-search="libero LIBERO Simulated continual learning benchmark with 130 tasks across 4 suites (Spatial, Object, Goal, LIBERO-10). franka manipulation simulation multi_task pick_place drawer multi_task hdf5">
+<div class="card" data-id="libero" data-format="hdf5" data-tags="manipulation,simulation,multi_task" data-demo="false" data-embodiment="franka" data-access="open" data-search="libero LIBERO Simulated continual learning benchmark with 130 tasks across 4 suites (Spatial, Object, Goal, LIBERO-10). franka manipulation simulation multi_task pick_place drawer multi_task hdf5">
   <div class="card-header" onclick="toggleCard(this)">
     <div style="flex:1;min-width:0;">
       <div class="card-title-row">
@@ -2005,6 +2039,8 @@
         
         
           
+        
+        
         
       </div>
     </div>
@@ -2115,7 +2151,7 @@
   </div>
 </div>
 
-<div class="card" data-id="furniturebench" data-format="other" data-tags="manipulation,real_world,multi_task" data-demo="false" data-embodiment="franka" data-search="furniturebench FurnitureBench Long-horizon furniture assembly benchmark with 5K+ episodes across 8 assembly tasks at 3 difficulty levels. franka manipulation real_world multi_task assembly other">
+<div class="card" data-id="furniturebench" data-format="other" data-tags="manipulation,real_world,multi_task" data-demo="false" data-embodiment="franka" data-access="open" data-search="furniturebench FurnitureBench Long-horizon furniture assembly benchmark with 5K+ episodes across 8 assembly tasks at 3 difficulty levels. franka manipulation real_world multi_task assembly other">
   <div class="card-header" onclick="toggleCard(this)">
     <div style="flex:1;min-width:0;">
       <div class="card-title-row">
@@ -2129,6 +2165,8 @@
         
         
           
+        
+        
         
       </div>
     </div>
@@ -2239,7 +2277,7 @@
   </div>
 </div>
 
-<div class="card" data-id="rlbench" data-format="other" data-tags="manipulation,simulation,multi_task" data-demo="false" data-embodiment="franka" data-search="rlbench RLBench Simulated benchmark with 100 manipulation tasks in CoppeliaSim. Procedurally generated demonstrations. franka manipulation simulation multi_task pick_place push drawer multi_task other">
+<div class="card" data-id="rlbench" data-format="other" data-tags="manipulation,simulation,multi_task" data-demo="false" data-embodiment="franka" data-access="open" data-search="rlbench RLBench Simulated benchmark with 100 manipulation tasks in CoppeliaSim. Procedurally generated demonstrations. franka manipulation simulation multi_task pick_place push drawer multi_task other">
   <div class="card-header" onclick="toggleCard(this)">
     <div style="flex:1;min-width:0;">
       <div class="card-title-row">
@@ -2253,6 +2291,8 @@
         
         
           
+        
+        
         
       </div>
     </div>
@@ -2358,7 +2398,7 @@
   </div>
 </div>
 
-<div class="card" data-id="metaworld" data-format="lerobot" data-tags="manipulation,simulation,multi_task" data-demo="false" data-embodiment="sawyer" data-search="metaworld MetaWorld Simulated Sawyer benchmark with 50 tabletop manipulation tasks for meta/multi-task learning. sawyer manipulation simulation multi_task pick_place push drawer assembly multi_task lerobot">
+<div class="card" data-id="metaworld" data-format="lerobot" data-tags="manipulation,simulation,multi_task" data-demo="false" data-embodiment="sawyer" data-access="open" data-search="metaworld MetaWorld Simulated Sawyer benchmark with 50 tabletop manipulation tasks for meta/multi-task learning. sawyer manipulation simulation multi_task pick_place push drawer assembly multi_task lerobot">
   <div class="card-header" onclick="toggleCard(this)">
     <div style="flex:1;min-width:0;">
       <div class="card-title-row">
@@ -2372,6 +2412,8 @@
         
         
           <span class="badge badge-scale">large</span>
+        
+        
         
       </div>
     </div>
@@ -2477,7 +2519,7 @@
   </div>
 </div>
 
-<div class="card" data-id="language_table" data-format="rlds" data-tags="manipulation,real_world,language_conditioned,large_scale,single_task" data-demo="false" data-embodiment="xarm" data-search="language_table Language Table Language-conditioned block pushing with 600K+ real episodes and open-vocabulary instructions. xarm manipulation real_world language_conditioned large_scale single_task push rlds">
+<div class="card" data-id="language_table" data-format="rlds" data-tags="manipulation,real_world,language_conditioned,large_scale,single_task" data-demo="false" data-embodiment="xarm" data-access="open" data-search="language_table Language Table Language-conditioned block pushing with 600K+ real episodes and open-vocabulary instructions. xarm manipulation real_world language_conditioned large_scale single_task push rlds">
   <div class="card-header" onclick="toggleCard(this)">
     <div style="flex:1;min-width:0;">
       <div class="card-title-row">
@@ -2491,6 +2533,8 @@
         
         
           <span class="badge badge-scale">large</span>
+        
+        
         
       </div>
     </div>
@@ -2601,7 +2645,7 @@
   </div>
 </div>
 
-<div class="card" data-id="bc_z" data-format="rlds" data-tags="manipulation,real_world,language_conditioned,multi_task" data-demo="false" data-embodiment="widowx" data-search="bc_z BC-Z Language-conditioned WidowX manipulation with 26K episodes across 100 tasks for zero-shot generalization. widowx manipulation real_world language_conditioned multi_task pick_place push multi_task rlds">
+<div class="card" data-id="bc_z" data-format="rlds" data-tags="manipulation,real_world,language_conditioned,multi_task" data-demo="false" data-embodiment="widowx" data-access="open" data-search="bc_z BC-Z Language-conditioned WidowX manipulation with 26K episodes across 100 tasks for zero-shot generalization. widowx manipulation real_world language_conditioned multi_task pick_place push multi_task rlds">
   <div class="card-header" onclick="toggleCard(this)">
     <div style="flex:1;min-width:0;">
       <div class="card-title-row">
@@ -2615,6 +2659,8 @@
         
         
           
+        
+        
         
       </div>
     </div>
@@ -2720,7 +2766,7 @@
   </div>
 </div>
 
-<div class="card" data-id="jaco_play" data-format="rlds" data-tags="manipulation,real_world,language_conditioned,single_task" data-demo="false" data-embodiment="jaco" data-search="jaco_play Jaco Play Teleoperated play data on Kinova Jaco 2 with language annotations. 1K+ tabletop manipulation episodes. jaco manipulation real_world language_conditioned single_task manipulation rlds">
+<div class="card" data-id="jaco_play" data-format="rlds" data-tags="manipulation,real_world,language_conditioned,single_task" data-demo="false" data-embodiment="jaco" data-access="open" data-search="jaco_play Jaco Play Teleoperated play data on Kinova Jaco 2 with language annotations. 1K+ tabletop manipulation episodes. jaco manipulation real_world language_conditioned single_task manipulation rlds">
   <div class="card-header" onclick="toggleCard(this)">
     <div style="flex:1;min-width:0;">
       <div class="card-title-row">
@@ -2734,6 +2780,8 @@
         
         
           
+        
+        
         
       </div>
     </div>
@@ -2853,7 +2901,7 @@
   </div>
 </div>
 
-<div class="card" data-id="taco_play" data-format="rlds" data-tags="manipulation,real_world,language_conditioned,multi_task" data-demo="false" data-embodiment="franka" data-search="taco_play TACO Play Task-agnostic Franka play data with language annotations. 3.6K episodes of tabletop manipulation. franka manipulation real_world language_conditioned multi_task manipulation multi_task rlds">
+<div class="card" data-id="taco_play" data-format="rlds" data-tags="manipulation,real_world,language_conditioned,multi_task" data-demo="false" data-embodiment="franka" data-access="open" data-search="taco_play TACO Play Task-agnostic Franka play data with language annotations. 3.6K episodes of tabletop manipulation. franka manipulation real_world language_conditioned multi_task manipulation multi_task rlds">
   <div class="card-header" onclick="toggleCard(this)">
     <div style="flex:1;min-width:0;">
       <div class="card-title-row">
@@ -2867,6 +2915,8 @@
         
         
           
+        
+        
         
       </div>
     </div>
@@ -2986,7 +3036,7 @@
   </div>
 </div>
 
-<div class="card" data-id="stanford_hydra" data-format="rlds" data-tags="manipulation,real_world" data-demo="false" data-embodiment="franka" data-search="stanford_hydra Stanford Hydra Multi-arm manipulation dataset from Stanford ILIAD lab, converted to RLDS format. franka manipulation real_world manipulation rlds">
+<div class="card" data-id="stanford_hydra" data-format="rlds" data-tags="manipulation,real_world" data-demo="false" data-embodiment="franka" data-access="open" data-search="stanford_hydra Stanford Hydra Multi-arm manipulation dataset from Stanford ILIAD lab, converted to RLDS format. franka manipulation real_world manipulation rlds">
   <div class="card-header" onclick="toggleCard(this)">
     <div style="flex:1;min-width:0;">
       <div class="card-title-row">
@@ -2997,6 +3047,8 @@
       <div class="card-badges">
         <span class="badge badge-format">rlds</span>
         <span class="badge badge-embodiment">franka</span>
+        
+        
         
         
       </div>
@@ -3090,7 +3142,7 @@
   </div>
 </div>
 
-<div class="card" data-id="pusht" data-format="lerobot" data-tags="manipulation,simulation,single_task" data-demo="true" data-embodiment="simulated" data-search="pusht PushT Simple 2D T-block pushing task with 206 episodes. The canonical LeRobot demo dataset. simulated manipulation simulation single_task push lerobot">
+<div class="card" data-id="pusht" data-format="lerobot" data-tags="manipulation,simulation,single_task" data-demo="true" data-embodiment="simulated" data-access="open" data-search="pusht PushT Simple 2D T-block pushing task with 206 episodes. The canonical LeRobot demo dataset. simulated manipulation simulation single_task push lerobot">
   <div class="card-header" onclick="toggleCard(this)">
     <div style="flex:1;min-width:0;">
       <div class="card-title-row">
@@ -3104,6 +3156,8 @@
         <span class="badge badge-demo">demo</span>
         
           
+        
+        
         
       </div>
     </div>
@@ -3214,7 +3268,7 @@
   </div>
 </div>
 
-<div class="card" data-id="droid_100" data-format="lerobot" data-tags="manipulation,real_world,multi_task" data-demo="true" data-embodiment="franka" data-search="droid_100 DROID 100 100-episode subset of DROID in LeRobot format. Ideal for quick experiments and CI. franka manipulation real_world multi_task pick_place manipulation lerobot">
+<div class="card" data-id="droid_100" data-format="lerobot" data-tags="manipulation,real_world,multi_task" data-demo="true" data-embodiment="franka" data-access="open" data-search="droid_100 DROID 100 100-episode subset of DROID in LeRobot format. Ideal for quick experiments and CI. franka manipulation real_world multi_task pick_place manipulation lerobot">
   <div class="card-header" onclick="toggleCard(this)">
     <div style="flex:1;min-width:0;">
       <div class="card-title-row">
@@ -3228,6 +3282,8 @@
         <span class="badge badge-demo">demo</span>
         
           
+        
+        
         
       </div>
     </div>
@@ -3341,7 +3397,7 @@
   </div>
 </div>
 
-<div class="card" data-id="aloha_static_coffee" data-format="lerobot" data-tags="manipulation,bi_manual,real_world,single_task" data-demo="true" data-embodiment="aloha" data-search="aloha_static_coffee ALOHA Static Coffee Real bimanual coffee preparation task with 50 teleoperated episodes on static ALOHA. aloha manipulation bi_manual real_world single_task manipulation lerobot">
+<div class="card" data-id="aloha_static_coffee" data-format="lerobot" data-tags="manipulation,bi_manual,real_world,single_task" data-demo="true" data-embodiment="aloha" data-access="open" data-search="aloha_static_coffee ALOHA Static Coffee Real bimanual coffee preparation task with 50 teleoperated episodes on static ALOHA. aloha manipulation bi_manual real_world single_task manipulation lerobot">
   <div class="card-header" onclick="toggleCard(this)">
     <div style="flex:1;min-width:0;">
       <div class="card-title-row">
@@ -3355,6 +3411,8 @@
         <span class="badge badge-demo">demo</span>
         
           
+        
+        
         
       </div>
     </div>
@@ -3468,6 +3526,1169 @@
   </div>
 </div>
 
+<div class="card" data-id="robocasa" data-format="hdf5" data-tags="manipulation,simulation,contact_rich,multi_task,large_scale" data-demo="false" data-embodiment="franka" data-access="open" data-search="robocasa RoboCasa Large-scale simulated kitchen manipulation: ~100 human demos per task across 100+ atomic/composite tasks, expanded to ~100k+ trajectories with MimicGen in MuJoCo. A standard pretraining corpus behind GR00T. franka manipulation simulation contact_rich multi_task large_scale pick_place drawer push contact_rich multi_task hdf5">
+  <div class="card-header" onclick="toggleCard(this)">
+    <div style="flex:1;min-width:0;">
+      <div class="card-title-row">
+        <span class="card-title">RoboCasa</span>
+        <span class="card-id">robocasa</span>
+      </div>
+      <div class="card-desc">Large-scale simulated kitchen manipulation: ~100 human demos per task across 100+ atomic/composite tasks, expanded to ~100k+ trajectories with MimicGen in MuJoCo. A standard pretraining corpus behind GR00T.</div>
+      <div class="card-badges">
+        <span class="badge badge-format">hdf5</span>
+        <span class="badge badge-embodiment">franka</span>
+        
+        
+          <span class="badge badge-scale">large</span>
+        
+        
+        
+      </div>
+    </div>
+    <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+  </div>
+
+  <div class="card-meta">
+    
+    <span class="meta-item">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      <strong>100,000</strong> episodes
+    </span>
+    
+    
+    <span class="meta-item">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      <strong>600</strong>h
+    </span>
+    
+    
+    <span class="meta-item">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      <strong>MIT</strong>
+    </span>
+    
+  </div>
+
+  <div class="card-body">
+    <div class="card-body-inner">
+      <div class="card-body-content">
+
+        
+        <div class="detail-section">
+          <div class="detail-label">Paper</div>
+          <a href="https://arxiv.org/abs/2406.02523" target="_blank" rel="noopener" class="paper-link">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            arXiv:2406.02523
+          </a>
+        </div>
+        
+
+        
+        <div class="detail-section">
+          <div class="detail-label">Tags</div>
+          <div class="card-badges">
+            <span class="badge badge-tag">manipulation</span><span class="badge badge-tag">simulation</span><span class="badge badge-tag">contact rich</span><span class="badge badge-tag">multi task</span><span class="badge badge-tag">large scale</span>
+          </div>
+        </div>
+        
+
+        
+        <div class="detail-section">
+          <div class="detail-label">Task Types</div>
+          <div class="card-badges">
+            <span class="badge badge-tag">pick place</span><span class="badge badge-tag">drawer</span><span class="badge badge-tag">push</span><span class="badge badge-tag">contact rich</span><span class="badge badge-tag">multi task</span>
+          </div>
+        </div>
+        
+
+        <div class="detail-section">
+          <div class="detail-label">Sources</div>
+          <div class="source-list">
+            
+            <div class="source-item">
+              <span class="source-type">http</span>
+              
+              <a href="https://robocasa.ai/" target="_blank" rel="noopener">https://robocasa.ai/</a>
+              
+              <span class="source-note">Canonical download via robocasa download_datasets.py (robomimic-style HDF5)</span>
+              
+            </div>
+            
+            <div class="source-item">
+              <span class="source-type">hf_hub</span>
+              
+              <a href="https://huggingface.co/datasets/haosulab/RoboCasa" target="_blank" rel="noopener">haosulab/RoboCasa</a>
+              
+              <span class="source-note">ManiSkill/SAPIEN-adapted mirror; LeRobot-converted versions also on the Hub</span>
+              
+            </div>
+            
+          </div>
+        </div>
+
+        <div class="detail-section">
+          <div class="detail-label">Forge Commands</div>
+          <div class="cmd-grid">
+            <div class="cmd-row">
+              <code>forge inspect robocasa</code>
+              <button class="copy-btn" onclick="copyCmd(event, this, 'forge inspect robocasa')">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                Copy
+              </button>
+            </div>
+            <div class="cmd-row">
+              <code>forge quality robocasa</code>
+              <button class="copy-btn" onclick="copyCmd(event, this, 'forge quality robocasa')">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                Copy
+              </button>
+            </div>
+            <div class="cmd-row">
+              <code>forge convert robocasa ./output --format lerobot-v3</code>
+              <button class="copy-btn" onclick="copyCmd(event, this, 'forge convert robocasa ./output --format lerobot-v3')">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                Copy
+              </button>
+            </div>
+            
+          </div>
+        </div>
+
+        
+        <div class="detail-section">
+          <div class="detail-label">Notes</div>
+          <div style="color: var(--text-muted); font-size: 0.85rem; line-height: 1.5;">MimicGen-generated + human demos; kitchen-centric. LeRobot conversions widely available for easy ingest.</div>
+        </div>
+        
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card" data-id="maniskill" data-format="hdf5" data-tags="manipulation,simulation,contact_rich,multi_task" data-demo="false" data-embodiment="franka,widowx,dexterous_hand" data-access="open" data-search="maniskill ManiSkill (v3) GPU-parallelized manipulation simulator and benchmark with millions of demonstration frames across diverse task families (pick-place, stacking, articulated objects, dexterous). franka widowx dexterous_hand manipulation simulation contact_rich multi_task pick_place push drawer contact_rich multi_task hdf5">
+  <div class="card-header" onclick="toggleCard(this)">
+    <div style="flex:1;min-width:0;">
+      <div class="card-title-row">
+        <span class="card-title">ManiSkill (v3)</span>
+        <span class="card-id">maniskill</span>
+      </div>
+      <div class="card-desc">GPU-parallelized manipulation simulator and benchmark with millions of demonstration frames across diverse task families (pick-place, stacking, articulated objects, dexterous).</div>
+      <div class="card-badges">
+        <span class="badge badge-format">hdf5</span>
+        <span class="badge badge-embodiment">franka</span><span class="badge badge-embodiment">widowx</span><span class="badge badge-embodiment">dexterous_hand</span>
+        
+        
+          
+        
+        
+        
+      </div>
+    </div>
+    <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+  </div>
+
+  <div class="card-meta">
+    
+    <span class="meta-item">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      <strong>30,000</strong> episodes
+    </span>
+    
+    
+    
+    <span class="meta-item">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      <strong>Apache-2.0</strong>
+    </span>
+    
+  </div>
+
+  <div class="card-body">
+    <div class="card-body-inner">
+      <div class="card-body-content">
+
+        
+        <div class="detail-section">
+          <div class="detail-label">Paper</div>
+          <a href="https://arxiv.org/abs/2410.00425" target="_blank" rel="noopener" class="paper-link">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            arXiv:2410.00425
+          </a>
+        </div>
+        
+
+        
+        <div class="detail-section">
+          <div class="detail-label">Tags</div>
+          <div class="card-badges">
+            <span class="badge badge-tag">manipulation</span><span class="badge badge-tag">simulation</span><span class="badge badge-tag">contact rich</span><span class="badge badge-tag">multi task</span>
+          </div>
+        </div>
+        
+
+        
+        <div class="detail-section">
+          <div class="detail-label">Task Types</div>
+          <div class="card-badges">
+            <span class="badge badge-tag">pick place</span><span class="badge badge-tag">push</span><span class="badge badge-tag">drawer</span><span class="badge badge-tag">contact rich</span><span class="badge badge-tag">multi task</span>
+          </div>
+        </div>
+        
+
+        <div class="detail-section">
+          <div class="detail-label">Sources</div>
+          <div class="source-list">
+            
+            <div class="source-item">
+              <span class="source-type">hf_hub</span>
+              
+              <a href="https://huggingface.co/datasets/haosulab/ManiSkill_Demonstrations" target="_blank" rel="noopener">haosulab/ManiSkill_Demonstrations</a>
+              
+              <span class="source-note">Download per-task via `python -m mani_skill.utils.download_demo &lt;env_id&gt;`</span>
+              
+            </div>
+            
+          </div>
+        </div>
+
+        <div class="detail-section">
+          <div class="detail-label">Forge Commands</div>
+          <div class="cmd-grid">
+            <div class="cmd-row">
+              <code>forge inspect maniskill</code>
+              <button class="copy-btn" onclick="copyCmd(event, this, 'forge inspect maniskill')">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                Copy
+              </button>
+            </div>
+            <div class="cmd-row">
+              <code>forge quality maniskill</code>
+              <button class="copy-btn" onclick="copyCmd(event, this, 'forge quality maniskill')">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                Copy
+              </button>
+            </div>
+            <div class="cmd-row">
+              <code>forge convert maniskill ./output --format lerobot-v3</code>
+              <button class="copy-btn" onclick="copyCmd(event, this, 'forge convert maniskill ./output --format lerobot-v3')">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                Copy
+              </button>
+            </div>
+            
+          </div>
+        </div>
+
+        
+        <div class="detail-section">
+          <div class="detail-label">Notes</div>
+          <div style="color: var(--text-muted); font-size: 0.85rem; line-height: 1.5;">Widely-used sim benchmark; trajectory .h5 + json. Episode count varies by task family.</div>
+        </div>
+        
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card" data-id="calvin" data-format="other" data-tags="manipulation,simulation,language_conditioned,multi_task" data-demo="false" data-embodiment="franka" data-access="open" data-search="calvin CALVIN Long-horizon, language-conditioned tabletop manipulation benchmark across four env splits (A/B/C/D); ~2M teleoperated trajectories with ~24k language-annotated. franka manipulation simulation language_conditioned multi_task pick_place drawer push multi_task other">
+  <div class="card-header" onclick="toggleCard(this)">
+    <div style="flex:1;min-width:0;">
+      <div class="card-title-row">
+        <span class="card-title">CALVIN</span>
+        <span class="card-id">calvin</span>
+      </div>
+      <div class="card-desc">Long-horizon, language-conditioned tabletop manipulation benchmark across four env splits (A/B/C/D); ~2M teleoperated trajectories with ~24k language-annotated.</div>
+      <div class="card-badges">
+        <span class="badge badge-format">other</span>
+        <span class="badge badge-embodiment">franka</span>
+        
+        
+          
+        
+        
+        
+      </div>
+    </div>
+    <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+  </div>
+
+  <div class="card-meta">
+    
+    <span class="meta-item">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      <strong>24,000</strong> episodes
+    </span>
+    
+    
+    <span class="meta-item">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      <strong>24</strong>h
+    </span>
+    
+    
+    <span class="meta-item">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      <strong>MIT</strong>
+    </span>
+    
+  </div>
+
+  <div class="card-body">
+    <div class="card-body-inner">
+      <div class="card-body-content">
+
+        
+        <div class="detail-section">
+          <div class="detail-label">Paper</div>
+          <a href="https://arxiv.org/abs/2112.03227" target="_blank" rel="noopener" class="paper-link">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            arXiv:2112.03227
+          </a>
+        </div>
+        
+
+        
+        <div class="detail-section">
+          <div class="detail-label">Tags</div>
+          <div class="card-badges">
+            <span class="badge badge-tag">manipulation</span><span class="badge badge-tag">simulation</span><span class="badge badge-tag">language conditioned</span><span class="badge badge-tag">multi task</span>
+          </div>
+        </div>
+        
+
+        
+        <div class="detail-section">
+          <div class="detail-label">Task Types</div>
+          <div class="card-badges">
+            <span class="badge badge-tag">pick place</span><span class="badge badge-tag">drawer</span><span class="badge badge-tag">push</span><span class="badge badge-tag">multi task</span>
+          </div>
+        </div>
+        
+
+        <div class="detail-section">
+          <div class="detail-label">Sources</div>
+          <div class="source-list">
+            
+            <div class="source-item">
+              <span class="source-type">http</span>
+              
+              <a href="https://github.com/mees/calvin" target="_blank" rel="noopener">https://github.com/mees/calvin</a>
+              
+              <span class="source-note">Download via dataset/download_data.sh (D, ABC, or ABCD splits); custom .npz frames</span>
+              
+            </div>
+            
+          </div>
+        </div>
+
+        <div class="detail-section">
+          <div class="detail-label">Forge Commands</div>
+          <div class="cmd-grid">
+            <div class="cmd-row">
+              <code>forge inspect calvin</code>
+              <button class="copy-btn" onclick="copyCmd(event, this, 'forge inspect calvin')">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                Copy
+              </button>
+            </div>
+            <div class="cmd-row">
+              <code>forge quality calvin</code>
+              <button class="copy-btn" onclick="copyCmd(event, this, 'forge quality calvin')">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                Copy
+              </button>
+            </div>
+            <div class="cmd-row">
+              <code>forge convert calvin ./output --format lerobot-v3</code>
+              <button class="copy-btn" onclick="copyCmd(event, this, 'forge convert calvin ./output --format lerobot-v3')">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                Copy
+              </button>
+            </div>
+            
+          </div>
+        </div>
+
+        
+        <div class="detail-section">
+          <div class="detail-label">Notes</div>
+          <div style="color: var(--text-muted); font-size: 0.85rem; line-height: 1.5;">Reference long-horizon language-conditioned benchmark; ~24k of ~2M trajectories carry language labels.</div>
+        </div>
+        
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card" data-id="robomimic" data-format="hdf5" data-tags="manipulation,simulation,contact_rich,multi_task" data-demo="false" data-embodiment="franka" data-access="open" data-search="robomimic robomimic Canonical imitation-learning / offline-RL manipulation benchmark: proficient- and mixed-human teleop demonstrations across sim and real tasks (Lift, Can, Square, Transport, Tool Hang). franka manipulation simulation contact_rich multi_task pick_place contact_rich multi_task hdf5">
+  <div class="card-header" onclick="toggleCard(this)">
+    <div style="flex:1;min-width:0;">
+      <div class="card-title-row">
+        <span class="card-title">robomimic</span>
+        <span class="card-id">robomimic</span>
+      </div>
+      <div class="card-desc">Canonical imitation-learning / offline-RL manipulation benchmark: proficient- and mixed-human teleop demonstrations across sim and real tasks (Lift, Can, Square, Transport, Tool Hang).</div>
+      <div class="card-badges">
+        <span class="badge badge-format">hdf5</span>
+        <span class="badge badge-embodiment">franka</span>
+        
+        
+          
+        
+        
+        
+      </div>
+    </div>
+    <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+  </div>
+
+  <div class="card-meta">
+    
+    <span class="meta-item">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      <strong>6,000</strong> episodes
+    </span>
+    
+    
+    
+    <span class="meta-item">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      <strong>MIT</strong>
+    </span>
+    
+  </div>
+
+  <div class="card-body">
+    <div class="card-body-inner">
+      <div class="card-body-content">
+
+        
+        <div class="detail-section">
+          <div class="detail-label">Paper</div>
+          <a href="https://arxiv.org/abs/2108.03298" target="_blank" rel="noopener" class="paper-link">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            arXiv:2108.03298
+          </a>
+        </div>
+        
+
+        
+        <div class="detail-section">
+          <div class="detail-label">Tags</div>
+          <div class="card-badges">
+            <span class="badge badge-tag">manipulation</span><span class="badge badge-tag">simulation</span><span class="badge badge-tag">contact rich</span><span class="badge badge-tag">multi task</span>
+          </div>
+        </div>
+        
+
+        
+        <div class="detail-section">
+          <div class="detail-label">Task Types</div>
+          <div class="card-badges">
+            <span class="badge badge-tag">pick place</span><span class="badge badge-tag">contact rich</span><span class="badge badge-tag">multi task</span>
+          </div>
+        </div>
+        
+
+        <div class="detail-section">
+          <div class="detail-label">Sources</div>
+          <div class="source-list">
+            
+            <div class="source-item">
+              <span class="source-type">http</span>
+              
+              <a href="https://robomimic.github.io/docs/datasets/robomimic_v0.1.html" target="_blank" rel="noopener">https://robomimic.github.io/docs/datasets/robomimic_v0.1.html</a>
+              
+              <span class="source-note">Download via download_datasets.py; native robomimic HDF5</span>
+              
+            </div>
+            
+          </div>
+        </div>
+
+        <div class="detail-section">
+          <div class="detail-label">Forge Commands</div>
+          <div class="cmd-grid">
+            <div class="cmd-row">
+              <code>forge inspect robomimic</code>
+              <button class="copy-btn" onclick="copyCmd(event, this, 'forge inspect robomimic')">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                Copy
+              </button>
+            </div>
+            <div class="cmd-row">
+              <code>forge quality robomimic</code>
+              <button class="copy-btn" onclick="copyCmd(event, this, 'forge quality robomimic')">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                Copy
+              </button>
+            </div>
+            <div class="cmd-row">
+              <code>forge convert robomimic ./output --format lerobot-v3</code>
+              <button class="copy-btn" onclick="copyCmd(event, this, 'forge convert robomimic ./output --format lerobot-v3')">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                Copy
+              </button>
+            </div>
+            
+          </div>
+        </div>
+
+        
+        <div class="detail-section">
+          <div class="detail-label">Notes</div>
+          <div style="color: var(--text-muted); font-size: 0.85rem; line-height: 1.5;">The reference HDF5 layout much of the ecosystem (incl. MimicGen, RoboCasa) inherits.</div>
+        </div>
+        
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card" data-id="mimicgen" data-format="hdf5" data-tags="manipulation,simulation,contact_rich,multi_task,large_scale" data-demo="false" data-embodiment="franka,sawyer,ur5" data-access="open" data-search="mimicgen MimicGen Auto-generated manipulation demonstrations: ~48k trajectories across 12 tasks synthesized from ~200 human demos, with diverse object/scene configs and multiple arms. franka sawyer ur5 manipulation simulation contact_rich multi_task large_scale pick_place contact_rich multi_task hdf5">
+  <div class="card-header" onclick="toggleCard(this)">
+    <div style="flex:1;min-width:0;">
+      <div class="card-title-row">
+        <span class="card-title">MimicGen</span>
+        <span class="card-id">mimicgen</span>
+      </div>
+      <div class="card-desc">Auto-generated manipulation demonstrations: ~48k trajectories across 12 tasks synthesized from ~200 human demos, with diverse object/scene configs and multiple arms.</div>
+      <div class="card-badges">
+        <span class="badge badge-format">hdf5</span>
+        <span class="badge badge-embodiment">franka</span><span class="badge badge-embodiment">sawyer</span><span class="badge badge-embodiment">ur5</span>
+        
+        
+          
+        
+        
+        
+      </div>
+    </div>
+    <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+  </div>
+
+  <div class="card-meta">
+    
+    <span class="meta-item">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      <strong>48,000</strong> episodes
+    </span>
+    
+    
+    
+    <span class="meta-item">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      <strong>CC-BY-4.0</strong>
+    </span>
+    
+  </div>
+
+  <div class="card-body">
+    <div class="card-body-inner">
+      <div class="card-body-content">
+
+        
+        <div class="detail-section">
+          <div class="detail-label">Paper</div>
+          <a href="https://arxiv.org/abs/2310.17596" target="_blank" rel="noopener" class="paper-link">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            arXiv:2310.17596
+          </a>
+        </div>
+        
+
+        
+        <div class="detail-section">
+          <div class="detail-label">Tags</div>
+          <div class="card-badges">
+            <span class="badge badge-tag">manipulation</span><span class="badge badge-tag">simulation</span><span class="badge badge-tag">contact rich</span><span class="badge badge-tag">multi task</span><span class="badge badge-tag">large scale</span>
+          </div>
+        </div>
+        
+
+        
+        <div class="detail-section">
+          <div class="detail-label">Task Types</div>
+          <div class="card-badges">
+            <span class="badge badge-tag">pick place</span><span class="badge badge-tag">contact rich</span><span class="badge badge-tag">multi task</span>
+          </div>
+        </div>
+        
+
+        <div class="detail-section">
+          <div class="detail-label">Sources</div>
+          <div class="source-list">
+            
+            <div class="source-item">
+              <span class="source-type">hf_hub</span>
+              
+              <a href="https://huggingface.co/datasets/amandlek/mimicgen_datasets" target="_blank" rel="noopener">amandlek/mimicgen_datasets</a>
+              
+              <span class="source-note">robomimic-format HDF5 (source/core/object groups)</span>
+              
+            </div>
+            
+          </div>
+        </div>
+
+        <div class="detail-section">
+          <div class="detail-label">Forge Commands</div>
+          <div class="cmd-grid">
+            <div class="cmd-row">
+              <code>forge inspect mimicgen</code>
+              <button class="copy-btn" onclick="copyCmd(event, this, 'forge inspect mimicgen')">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                Copy
+              </button>
+            </div>
+            <div class="cmd-row">
+              <code>forge quality mimicgen</code>
+              <button class="copy-btn" onclick="copyCmd(event, this, 'forge quality mimicgen')">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                Copy
+              </button>
+            </div>
+            <div class="cmd-row">
+              <code>forge convert mimicgen ./output --format lerobot-v3</code>
+              <button class="copy-btn" onclick="copyCmd(event, this, 'forge convert mimicgen ./output --format lerobot-v3')">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                Copy
+              </button>
+            </div>
+            
+          </div>
+        </div>
+
+        
+        <div class="detail-section">
+          <div class="detail-label">Notes</div>
+          <div style="color: var(--text-muted); font-size: 0.85rem; line-height: 1.5;">Data-generation companion to robomimic; datasets CC-BY-4.0 (code is NVIDIA Source Code License).</div>
+        </div>
+        
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card" data-id="robomind" data-format="hdf5" data-tags="manipulation,bi_manual,humanoid,real_world,multi_task,large_scale,registration_required" data-demo="false" data-embodiment="franka,ur5,agilex,tien_kung" data-access="registration_required" data-search="robomind RoboMIND Multi-embodiment real-world teleoperation dataset: ~107k trajectories, 479 tasks, 96 object classes across Franka single-arm, AgileX dual-arm, UR-5e, and the Tien Kung humanoid. franka ur5 agilex tien_kung manipulation bi_manual humanoid real_world multi_task large_scale registration_required pick_place push drawer multi_task hdf5">
+  <div class="card-header" onclick="toggleCard(this)">
+    <div style="flex:1;min-width:0;">
+      <div class="card-title-row">
+        <span class="card-title">RoboMIND</span>
+        <span class="card-id">robomind</span>
+      </div>
+      <div class="card-desc">Multi-embodiment real-world teleoperation dataset: ~107k trajectories, 479 tasks, 96 object classes across Franka single-arm, AgileX dual-arm, UR-5e, and the Tien Kung humanoid.</div>
+      <div class="card-badges">
+        <span class="badge badge-format">hdf5</span>
+        <span class="badge badge-embodiment">franka</span><span class="badge badge-embodiment">ur5</span><span class="badge badge-embodiment">agilex</span><span class="badge badge-embodiment">tien_kung</span>
+        
+        
+          <span class="badge badge-scale">large</span>
+        
+        <span class="badge badge-gated">🔒 registration</span>
+        
+      </div>
+    </div>
+    <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+  </div>
+
+  <div class="card-meta">
+    
+    <span class="meta-item">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      <strong>107,000</strong> episodes
+    </span>
+    
+    
+    <span class="meta-item">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      <strong>1400</strong>h
+    </span>
+    
+    
+    <span class="meta-item">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      <strong>Apache-2.0</strong>
+    </span>
+    
+  </div>
+
+  <div class="card-body">
+    <div class="card-body-inner">
+      <div class="card-body-content">
+
+        
+        <div class="detail-section">
+          <div class="detail-label">Paper</div>
+          <a href="https://arxiv.org/abs/2412.13877" target="_blank" rel="noopener" class="paper-link">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            arXiv:2412.13877
+          </a>
+        </div>
+        
+
+        
+        <div class="detail-section">
+          <div class="detail-label">Tags</div>
+          <div class="card-badges">
+            <span class="badge badge-tag">manipulation</span><span class="badge badge-tag">bi manual</span><span class="badge badge-tag">humanoid</span><span class="badge badge-tag">real world</span><span class="badge badge-tag">multi task</span><span class="badge badge-tag">large scale</span><span class="badge badge-tag">registration required</span>
+          </div>
+        </div>
+        
+
+        
+        <div class="detail-section">
+          <div class="detail-label">Task Types</div>
+          <div class="card-badges">
+            <span class="badge badge-tag">pick place</span><span class="badge badge-tag">push</span><span class="badge badge-tag">drawer</span><span class="badge badge-tag">multi task</span>
+          </div>
+        </div>
+        
+
+        <div class="detail-section">
+          <div class="detail-label">Sources</div>
+          <div class="source-list">
+            
+            <div class="source-item">
+              <span class="source-type">hf_hub</span>
+              
+              <a href="https://huggingface.co/datasets/x-humanoid-robomind/RoboMIND" target="_blank" rel="noopener">x-humanoid-robomind/RoboMIND</a>
+              
+              <span class="source-note">Requires platform registration/agreement; LeRobot-format versions available</span>
+              
+            </div>
+            
+          </div>
+        </div>
+
+        <div class="detail-section">
+          <div class="detail-label">Forge Commands</div>
+          <div class="cmd-grid">
+            <div class="cmd-row">
+              <code>forge inspect robomind</code>
+              <button class="copy-btn" onclick="copyCmd(event, this, 'forge inspect robomind')">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                Copy
+              </button>
+            </div>
+            <div class="cmd-row">
+              <code>forge quality robomind</code>
+              <button class="copy-btn" onclick="copyCmd(event, this, 'forge quality robomind')">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                Copy
+              </button>
+            </div>
+            <div class="cmd-row">
+              <code>forge convert robomind ./output --format lerobot-v3</code>
+              <button class="copy-btn" onclick="copyCmd(event, this, 'forge convert robomind ./output --format lerobot-v3')">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                Copy
+              </button>
+            </div>
+            
+          </div>
+        </div>
+
+        
+        <div class="detail-section">
+          <div class="detail-label">Notes</div>
+          <div style="color: var(--text-muted); font-size: 0.85rem; line-height: 1.5;">Access requires registration (BAAI/HF gated). Strong multi-embodiment + humanoid coverage.</div>
+        </div>
+        
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card" data-id="agibot_world_beta" data-format="lerobot-v2" data-tags="manipulation,bi_manual,humanoid,real_world,multi_task,large_scale,non_commercial" data-demo="false" data-embodiment="agibot_g1" data-access="non_commercial" data-search="agibot_world_beta AgiBot World Beta Large-scale real-world dual-arm humanoid manipulation: 1M+ trajectories, ~2,976 hours, 217 tasks and 87 skills with dexterous hands and mobile bases. Supersedes AgiBot World Alpha. agibot_g1 manipulation bi_manual humanoid real_world multi_task large_scale non_commercial pick_place pour contact_rich multi_task lerobot-v2">
+  <div class="card-header" onclick="toggleCard(this)">
+    <div style="flex:1;min-width:0;">
+      <div class="card-title-row">
+        <span class="card-title">AgiBot World Beta</span>
+        <span class="card-id">agibot_world_beta</span>
+      </div>
+      <div class="card-desc">Large-scale real-world dual-arm humanoid manipulation: 1M+ trajectories, ~2,976 hours, 217 tasks and 87 skills with dexterous hands and mobile bases. Supersedes AgiBot World Alpha.</div>
+      <div class="card-badges">
+        <span class="badge badge-format">lerobot-v2</span>
+        <span class="badge badge-embodiment">agibot_g1</span>
+        
+        
+          <span class="badge badge-scale">large</span>
+        
+        
+        <span class="badge badge-gated">⊘ non-commercial</span>
+      </div>
+    </div>
+    <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+  </div>
+
+  <div class="card-meta">
+    
+    <span class="meta-item">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      <strong>1,000,000</strong> episodes
+    </span>
+    
+    
+    <span class="meta-item">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      <strong>2976</strong>h
+    </span>
+    
+    
+    <span class="meta-item">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      <strong>CC-BY-NC-SA-4.0</strong>
+    </span>
+    
+  </div>
+
+  <div class="card-body">
+    <div class="card-body-inner">
+      <div class="card-body-content">
+
+        
+        <div class="detail-section">
+          <div class="detail-label">Paper</div>
+          <a href="https://arxiv.org/abs/2503.06669" target="_blank" rel="noopener" class="paper-link">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            arXiv:2503.06669
+          </a>
+        </div>
+        
+
+        
+        <div class="detail-section">
+          <div class="detail-label">Tags</div>
+          <div class="card-badges">
+            <span class="badge badge-tag">manipulation</span><span class="badge badge-tag">bi manual</span><span class="badge badge-tag">humanoid</span><span class="badge badge-tag">real world</span><span class="badge badge-tag">multi task</span><span class="badge badge-tag">large scale</span><span class="badge badge-tag">non commercial</span>
+          </div>
+        </div>
+        
+
+        
+        <div class="detail-section">
+          <div class="detail-label">Task Types</div>
+          <div class="card-badges">
+            <span class="badge badge-tag">pick place</span><span class="badge badge-tag">pour</span><span class="badge badge-tag">contact rich</span><span class="badge badge-tag">multi task</span>
+          </div>
+        </div>
+        
+
+        <div class="detail-section">
+          <div class="detail-label">Sources</div>
+          <div class="source-list">
+            
+            <div class="source-item">
+              <span class="source-type">hf_hub</span>
+              
+              <a href="https://huggingface.co/datasets/agibot-world/AgiBotWorld-Beta" target="_blank" rel="noopener">agibot-world/AgiBotWorld-Beta</a>
+              
+              
+              
+            </div>
+            
+          </div>
+        </div>
+
+        <div class="detail-section">
+          <div class="detail-label">Forge Commands</div>
+          <div class="cmd-grid">
+            <div class="cmd-row">
+              <code>forge inspect agibot_world_beta</code>
+              <button class="copy-btn" onclick="copyCmd(event, this, 'forge inspect agibot_world_beta')">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                Copy
+              </button>
+            </div>
+            <div class="cmd-row">
+              <code>forge quality agibot_world_beta</code>
+              <button class="copy-btn" onclick="copyCmd(event, this, 'forge quality agibot_world_beta')">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                Copy
+              </button>
+            </div>
+            <div class="cmd-row">
+              <code>forge convert agibot_world_beta ./output --format lerobot-v3</code>
+              <button class="copy-btn" onclick="copyCmd(event, this, 'forge convert agibot_world_beta ./output --format lerobot-v3')">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                Copy
+              </button>
+            </div>
+            
+          </div>
+        </div>
+
+        
+        <div class="detail-section">
+          <div class="detail-label">Notes</div>
+          <div style="color: var(--text-muted); font-size: 0.85rem; line-height: 1.5;">Non-commercial license (CC-BY-NC-SA-4.0). Full-scale successor to agibot_world_alpha.</div>
+        </div>
+        
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card" data-id="robotwin" data-format="hdf5" data-tags="manipulation,bi_manual,simulation,contact_rich,multi_task,large_scale" data-demo="false" data-embodiment="aloha,franka,ur5" data-access="open" data-search="robotwin RoboTwin 2.0 Scalable bimanual manipulation data generator and benchmark: 100k+ domain-randomized expert trajectories across 50 dual-arm tasks and five embodiments (incl. Aloha-AgileX). aloha franka ur5 manipulation bi_manual simulation contact_rich multi_task large_scale pick_place contact_rich multi_task hdf5">
+  <div class="card-header" onclick="toggleCard(this)">
+    <div style="flex:1;min-width:0;">
+      <div class="card-title-row">
+        <span class="card-title">RoboTwin 2.0</span>
+        <span class="card-id">robotwin</span>
+      </div>
+      <div class="card-desc">Scalable bimanual manipulation data generator and benchmark: 100k+ domain-randomized expert trajectories across 50 dual-arm tasks and five embodiments (incl. Aloha-AgileX).</div>
+      <div class="card-badges">
+        <span class="badge badge-format">hdf5</span>
+        <span class="badge badge-embodiment">aloha</span><span class="badge badge-embodiment">franka</span><span class="badge badge-embodiment">ur5</span>
+        
+        
+          <span class="badge badge-scale">large</span>
+        
+        
+        
+      </div>
+    </div>
+    <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+  </div>
+
+  <div class="card-meta">
+    
+    <span class="meta-item">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      <strong>100,000</strong> episodes
+    </span>
+    
+    
+    
+    <span class="meta-item">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      <strong>Apache-2.0</strong>
+    </span>
+    
+  </div>
+
+  <div class="card-body">
+    <div class="card-body-inner">
+      <div class="card-body-content">
+
+        
+        <div class="detail-section">
+          <div class="detail-label">Paper</div>
+          <a href="https://arxiv.org/abs/2506.18088" target="_blank" rel="noopener" class="paper-link">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            arXiv:2506.18088
+          </a>
+        </div>
+        
+
+        
+        <div class="detail-section">
+          <div class="detail-label">Tags</div>
+          <div class="card-badges">
+            <span class="badge badge-tag">manipulation</span><span class="badge badge-tag">bi manual</span><span class="badge badge-tag">simulation</span><span class="badge badge-tag">contact rich</span><span class="badge badge-tag">multi task</span><span class="badge badge-tag">large scale</span>
+          </div>
+        </div>
+        
+
+        
+        <div class="detail-section">
+          <div class="detail-label">Task Types</div>
+          <div class="card-badges">
+            <span class="badge badge-tag">pick place</span><span class="badge badge-tag">contact rich</span><span class="badge badge-tag">multi task</span>
+          </div>
+        </div>
+        
+
+        <div class="detail-section">
+          <div class="detail-label">Sources</div>
+          <div class="source-list">
+            
+            <div class="source-item">
+              <span class="source-type">hf_hub</span>
+              
+              <a href="https://huggingface.co/datasets/TianxingChen/RoboTwin2.0" target="_blank" rel="noopener">TianxingChen/RoboTwin2.0</a>
+              
+              <span class="source-note">RoboTwin2_dataset (~80GB); LeRobot-compatible</span>
+              
+            </div>
+            
+          </div>
+        </div>
+
+        <div class="detail-section">
+          <div class="detail-label">Forge Commands</div>
+          <div class="cmd-grid">
+            <div class="cmd-row">
+              <code>forge inspect robotwin</code>
+              <button class="copy-btn" onclick="copyCmd(event, this, 'forge inspect robotwin')">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                Copy
+              </button>
+            </div>
+            <div class="cmd-row">
+              <code>forge quality robotwin</code>
+              <button class="copy-btn" onclick="copyCmd(event, this, 'forge quality robotwin')">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                Copy
+              </button>
+            </div>
+            <div class="cmd-row">
+              <code>forge convert robotwin ./output --format lerobot-v3</code>
+              <button class="copy-btn" onclick="copyCmd(event, this, 'forge convert robotwin ./output --format lerobot-v3')">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                Copy
+              </button>
+            </div>
+            
+          </div>
+        </div>
+
+        
+        <div class="detail-section">
+          <div class="detail-label">Notes</div>
+          <div style="color: var(--text-muted); font-size: 0.85rem; line-height: 1.5;">Strong domain randomization; five arms (Franka, Piper, UR5, ARX-X5, Aloha-AgileX).</div>
+        </div>
+        
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card" data-id="umi" data-format="zarr" data-tags="manipulation,real_world,contact_rich" data-demo="false" data-embodiment="handheld_gripper,ur5" data-access="open" data-search="umi UMI (Universal Manipulation Interface) In-the-wild human demonstrations collected with handheld grippers, yielding hardware-agnostic, deployable manipulation policies (incl. bimanual and dynamic tasks). handheld_gripper ur5 manipulation real_world contact_rich pick_place push contact_rich zarr">
+  <div class="card-header" onclick="toggleCard(this)">
+    <div style="flex:1;min-width:0;">
+      <div class="card-title-row">
+        <span class="card-title">UMI (Universal Manipulation Interface)</span>
+        <span class="card-id">umi</span>
+      </div>
+      <div class="card-desc">In-the-wild human demonstrations collected with handheld grippers, yielding hardware-agnostic, deployable manipulation policies (incl. bimanual and dynamic tasks).</div>
+      <div class="card-badges">
+        <span class="badge badge-format">zarr</span>
+        <span class="badge badge-embodiment">handheld_gripper</span><span class="badge badge-embodiment">ur5</span>
+        
+        
+          
+        
+        
+        
+      </div>
+    </div>
+    <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+  </div>
+
+  <div class="card-meta">
+    
+    <span class="meta-item">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      <strong>1,400</strong> episodes
+    </span>
+    
+    
+    
+    <span class="meta-item">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      <strong>MIT</strong>
+    </span>
+    
+  </div>
+
+  <div class="card-body">
+    <div class="card-body-inner">
+      <div class="card-body-content">
+
+        
+        <div class="detail-section">
+          <div class="detail-label">Paper</div>
+          <a href="https://arxiv.org/abs/2402.10329" target="_blank" rel="noopener" class="paper-link">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            arXiv:2402.10329
+          </a>
+        </div>
+        
+
+        
+        <div class="detail-section">
+          <div class="detail-label">Tags</div>
+          <div class="card-badges">
+            <span class="badge badge-tag">manipulation</span><span class="badge badge-tag">real world</span><span class="badge badge-tag">contact rich</span>
+          </div>
+        </div>
+        
+
+        
+        <div class="detail-section">
+          <div class="detail-label">Task Types</div>
+          <div class="card-badges">
+            <span class="badge badge-tag">pick place</span><span class="badge badge-tag">push</span><span class="badge badge-tag">contact rich</span>
+          </div>
+        </div>
+        
+
+        <div class="detail-section">
+          <div class="detail-label">Sources</div>
+          <div class="source-list">
+            
+            <div class="source-item">
+              <span class="source-type">http</span>
+              
+              <a href="https://umi-gripper.github.io/" target="_blank" rel="noopener">https://umi-gripper.github.io/</a>
+              
+              <span class="source-note">Example datasets released as Zarr; see project page / GitHub</span>
+              
+            </div>
+            
+          </div>
+        </div>
+
+        <div class="detail-section">
+          <div class="detail-label">Forge Commands</div>
+          <div class="cmd-grid">
+            <div class="cmd-row">
+              <code>forge inspect umi</code>
+              <button class="copy-btn" onclick="copyCmd(event, this, 'forge inspect umi')">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                Copy
+              </button>
+            </div>
+            <div class="cmd-row">
+              <code>forge quality umi</code>
+              <button class="copy-btn" onclick="copyCmd(event, this, 'forge quality umi')">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                Copy
+              </button>
+            </div>
+            <div class="cmd-row">
+              <code>forge convert umi ./output --format lerobot-v3</code>
+              <button class="copy-btn" onclick="copyCmd(event, this, 'forge convert umi ./output --format lerobot-v3')">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                Copy
+              </button>
+            </div>
+            
+          </div>
+        </div>
+
+        
+        <div class="detail-section">
+          <div class="detail-label">Notes</div>
+          <div style="color: var(--text-muted); font-size: 0.85rem; line-height: 1.5;">Human handheld-gripper collection paradigm (no robot needed to collect). Zarr-native.</div>
+        </div>
+        
+
+      </div>
+    </div>
+  </div>
+</div>
+
 </div>
 
 <div class="no-results" id="noResults" style="display:none">
@@ -3505,6 +4726,7 @@ function filterCards() {
   var fmt = document.getElementById('formatFilter').value;
   var tag = document.getElementById('tagFilter').value;
   var emb = document.getElementById('embodimentFilter').value;
+  var access = document.getElementById('accessFilter').value;
   var demo = document.getElementById('demoFilter').value;
   var cards = document.querySelectorAll('.card');
   var visible = 0;
@@ -3515,6 +4737,7 @@ function filterCards() {
     if (fmt && card.dataset.format !== fmt) show = false;
     if (tag && card.dataset.tags.indexOf(tag) === -1) show = false;
     if (emb && card.dataset.embodiment.indexOf(emb) === -1) show = false;
+    if (access && card.dataset.access !== access) show = false;
     if (demo === 'demo' && card.dataset.demo !== 'true') show = false;
     card.style.display = show ? '' : 'none';
     if (show) visible++;

@@ -327,6 +327,7 @@ TEMPLATE = """\
   .badge-demo { color: var(--orange); background: var(--orange-dim); border-color: rgba(251,191,36,0.2); }
   .badge-tag { color: var(--text-secondary); background: rgba(94,110,138,0.1); border-color: rgba(94,110,138,0.15); }
   .badge-scale { color: var(--teal); background: var(--teal-dim); border-color: rgba(45,212,191,0.2); }
+  .badge-gated { color: var(--rose); background: var(--rose-dim); border-color: rgba(251,113,133,0.25); }
 
   .chevron {
     color: var(--text-muted);
@@ -576,6 +577,12 @@ TEMPLATE = """\
     {% for emb in all_embodiments %}<option value="{{ emb }}">{{ emb }}</option>
     {% endfor %}
   </select>
+  <select class="filter-select" id="accessFilter" onchange="filterCards()">
+    <option value="">All Access</option>
+    <option value="open">Open (no restrictions)</option>
+    <option value="registration_required">Registration required</option>
+    <option value="non_commercial">Non-commercial</option>
+  </select>
   <select class="filter-select" id="demoFilter" onchange="filterCards()">
     <option value="">All Datasets</option>
     <option value="demo">Demo-Suitable Only</option>
@@ -585,7 +592,7 @@ TEMPLATE = """\
 
 <div class="grid" id="grid">
 {% for entry in entries %}
-<div class="card" data-id="{{ entry.id }}" data-format="{{ entry.format }}" data-tags="{{ entry.tags | join(',') }}" data-demo="{{ 'true' if entry.demo_suitable else 'false' }}" data-embodiment="{{ entry.embodiment | join(',') }}" data-search="{{ entry.id }} {{ entry.name }} {{ entry.description }} {{ entry.embodiment | join(' ') }} {{ entry.tags | join(' ') }} {{ entry.task_types | join(' ') }} {{ entry.format }}">
+<div class="card" data-id="{{ entry.id }}" data-format="{{ entry.format }}" data-tags="{{ entry.tags | join(',') }}" data-demo="{{ 'true' if entry.demo_suitable else 'false' }}" data-embodiment="{{ entry.embodiment | join(',') }}" data-access="{% if 'registration_required' in entry.tags %}registration_required{% elif 'non_commercial' in entry.tags %}non_commercial{% else %}open{% endif %}" data-search="{{ entry.id }} {{ entry.name }} {{ entry.description }} {{ entry.embodiment | join(' ') }} {{ entry.tags | join(' ') }} {{ entry.task_types | join(' ') }} {{ entry.format }}">
   <div class="card-header" onclick="toggleCard(this)">
     <div style="flex:1;min-width:0;">
       <div class="card-title-row">
@@ -600,6 +607,8 @@ TEMPLATE = """\
         {% if entry.scale and entry.scale.episodes is not none %}
           {% if entry.scale.episodes >= 50000 %}<span class="badge badge-scale">large</span>{% endif %}
         {% endif %}
+        {% if 'registration_required' in entry.tags %}<span class="badge badge-gated">🔒 registration</span>{% endif %}
+        {% if 'non_commercial' in entry.tags %}<span class="badge badge-gated">⊘ non-commercial</span>{% endif %}
       </div>
     </div>
     <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
@@ -763,6 +772,7 @@ function filterCards() {
   var fmt = document.getElementById('formatFilter').value;
   var tag = document.getElementById('tagFilter').value;
   var emb = document.getElementById('embodimentFilter').value;
+  var access = document.getElementById('accessFilter').value;
   var demo = document.getElementById('demoFilter').value;
   var cards = document.querySelectorAll('.card');
   var visible = 0;
@@ -773,6 +783,7 @@ function filterCards() {
     if (fmt && card.dataset.format !== fmt) show = false;
     if (tag && card.dataset.tags.indexOf(tag) === -1) show = false;
     if (emb && card.dataset.embodiment.indexOf(emb) === -1) show = false;
+    if (access && card.dataset.access !== access) show = false;
     if (demo === 'demo' && card.dataset.demo !== 'true') show = false;
     card.style.display = show ? '' : 'none';
     if (show) visible++;
@@ -829,9 +840,11 @@ def generate_registry_html(entries: list[DatasetEntry]) -> str:
     env = Environment(autoescape=True)
     template = env.from_string(TEMPLATE)
 
-    # Compute stats
+    # Compute stats. Access-restriction tags get their own dedicated filter,
+    # so keep them out of the general tag dropdown.
+    access_tags = {"registration_required", "non_commercial"}
     formats = sorted({e.format for e in entries})
-    all_tags = sorted({t for e in entries for t in e.tags})
+    all_tags = sorted({t for e in entries for t in e.tags} - access_tags)
     all_embodiments = {emb for e in entries for emb in e.embodiment}
     total_episodes = sum(
         e.scale.episodes for e in entries

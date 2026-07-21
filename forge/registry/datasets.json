@@ -1,6 +1,6 @@
 {
-  "version": "1.0.0",
-  "updated_at": "2026-03-08",
+  "version": "1.1.0",
+  "updated_at": "2026-07-21",
   "datasets": {
     "open_x_embodiment": {
       "id": "open_x_embodiment",
@@ -9,8 +9,23 @@
       "paper_url": "https://arxiv.org/abs/2310.08864",
       "license": "Apache-2.0",
       "format": "rlds",
-      "embodiment": ["google_robot", "franka", "widowx", "jaco", "sawyer", "ur5", "kuka"],
-      "task_types": ["pick_place", "push", "pour", "wipe", "drawer", "multi_task"],
+      "embodiment": [
+        "google_robot",
+        "franka",
+        "widowx",
+        "jaco",
+        "sawyer",
+        "ur5",
+        "kuka"
+      ],
+      "task_types": [
+        "pick_place",
+        "push",
+        "pour",
+        "wipe",
+        "drawer",
+        "multi_task"
+      ],
       "scale": {
         "episodes": 2400000,
         "approximate": true
@@ -27,7 +42,13 @@
         }
       ],
       "demo_suitable": false,
-      "tags": ["manipulation", "real_world", "multi_task", "large_scale", "language_conditioned"],
+      "tags": [
+        "manipulation",
+        "real_world",
+        "multi_task",
+        "large_scale",
+        "language_conditioned"
+      ],
       "forge_verified": false,
       "added_at": "2026-03-08"
     },
@@ -38,8 +59,16 @@
       "paper_url": "https://arxiv.org/abs/2403.12945",
       "license": "CC-BY-4.0",
       "format": "rlds",
-      "embodiment": ["franka"],
-      "task_types": ["pick_place", "push", "wipe", "drawer", "multi_task"],
+      "embodiment": [
+        "franka"
+      ],
+      "task_types": [
+        "pick_place",
+        "push",
+        "wipe",
+        "drawer",
+        "multi_task"
+      ],
       "scale": {
         "episodes": 76000,
         "hours": 350.0,
@@ -58,7 +87,12 @@
         }
       ],
       "demo_suitable": false,
-      "tags": ["manipulation", "real_world", "multi_task", "large_scale"],
+      "tags": [
+        "manipulation",
+        "real_world",
+        "multi_task",
+        "large_scale"
+      ],
       "forge_verified": false,
       "added_at": "2026-03-08"
     },
@@ -69,8 +103,15 @@
       "paper_url": "https://arxiv.org/abs/2308.12952",
       "license": "MIT",
       "format": "rlds",
-      "embodiment": ["widowx"],
-      "task_types": ["pick_place", "push", "wipe", "drawer"],
+      "embodiment": [
+        "widowx"
+      ],
+      "task_types": [
+        "pick_place",
+        "push",
+        "wipe",
+        "drawer"
+      ],
       "scale": {
         "episodes": 53192,
         "hours": 105.0,
@@ -89,7 +130,12 @@
         }
       ],
       "demo_suitable": false,
-      "tags": ["manipulation", "real_world", "multi_task", "large_scale"],
+      "tags": [
+        "manipulation",
+        "real_world",
+        "multi_task",
+        "large_scale"
+      ],
       "forge_verified": false,
       "added_at": "2026-03-08"
     },
@@ -100,8 +146,15 @@
       "paper_url": "https://arxiv.org/abs/2309.01918",
       "license": "MIT",
       "format": "rlds",
-      "embodiment": ["franka"],
-      "task_types": ["pick_place", "pour", "wipe", "multi_task"],
+      "embodiment": [
+        "franka"
+      ],
+      "task_types": [
+        "pick_place",
+        "pour",
+        "wipe",
+        "multi_task"
+      ],
       "scale": {
         "episodes": 100000,
         "approximate": true
@@ -119,7 +172,11 @@
         }
       ],
       "demo_suitable": false,
-      "tags": ["manipulation", "real_world", "multi_task"],
+      "tags": [
+        "manipulation",
+        "real_world",
+        "multi_task"
+      ],
       "forge_verified": false,
       "added_at": "2026-03-08"
     },
@@ -130,8 +187,12 @@
       "paper_url": "https://arxiv.org/abs/2304.13705",
       "license": "MIT",
       "format": "lerobot",
-      "embodiment": ["aloha"],
-      "task_types": ["pick_place"],
+      "embodiment": [
+        "aloha"
+      ],
+      "task_types": [
+        "pick_place"
+      ],
       "scale": {
         "episodes": 50,
         "approximate": false
@@ -145,7 +206,12 @@
       "demo_suitable": true,
       "demo_episodes": 50,
       "demo_source_index": 0,
-      "tags": ["manipulation", "bi_manual", "simulation", "single_task"],
+      "tags": [
+        "manipulation",
+        "bi_manual",
+        "simulation",
+        "single_task"
+      ],
       "forge_verified": false,
       "added_at": "2026-03-08"
     },
@@ -156,8 +222,12 @@
       "paper_url": "https://arxiv.org/abs/2304.13705",
       "license": "MIT",
       "format": "lerobot",
-      "embodiment": ["aloha"],
-      "task_types": ["insertion"],
+      "embodiment": [
+        "aloha"
+      ],
+      "task_types": [
+        "insertion"
+      ],
       "scale": {
         "episodes": 50,
         "approximate": false
@@ -171,7 +241,12 @@
       "demo_suitable": true,
       "demo_episodes": 50,
       "demo_source_index": 0,
-      "tags": ["manipulation", "bi_manual", "simulation", "single_task"],
+      "tags": [
+        "manipulation",
+        "bi_manual",
+        "simulation",
+        "single_task"
+      ],
       "forge_verified": false,
       "added_at": "2026-03-08"
     },
@@ -182,8 +257,12 @@
       "paper_url": "https://arxiv.org/abs/2304.13705",
       "license": "MIT",
       "format": "lerobot",
-      "embodiment": ["aloha"],
-      "task_types": ["manipulation"],
+      "embodiment": [
+        "aloha"
+      ],
+      "task_types": [
+        "manipulation"
+      ],
       "scale": {
         "episodes": 50,
         "approximate": false
@@ -197,7 +276,12 @@
       "demo_suitable": true,
       "demo_episodes": 50,
       "demo_source_index": 0,
-      "tags": ["manipulation", "bi_manual", "real_world", "single_task"],
+      "tags": [
+        "manipulation",
+        "bi_manual",
+        "real_world",
+        "single_task"
+      ],
       "forge_verified": false,
       "added_at": "2026-03-08"
     },
@@ -208,8 +292,13 @@
       "paper_url": "https://arxiv.org/abs/2401.02117",
       "license": "MIT",
       "format": "lerobot",
-      "embodiment": ["aloha"],
-      "task_types": ["drawer", "manipulation"],
+      "embodiment": [
+        "aloha"
+      ],
+      "task_types": [
+        "drawer",
+        "manipulation"
+      ],
       "scale": {
         "episodes": 85,
         "approximate": false
@@ -223,7 +312,13 @@
       "demo_suitable": true,
       "demo_episodes": 85,
       "demo_source_index": 0,
-      "tags": ["manipulation", "bi_manual", "mobile_manipulation", "real_world", "single_task"],
+      "tags": [
+        "manipulation",
+        "bi_manual",
+        "mobile_manipulation",
+        "real_world",
+        "single_task"
+      ],
       "forge_verified": false,
       "added_at": "2026-03-08"
     },
@@ -234,8 +329,14 @@
       "paper_url": "https://arxiv.org/abs/2503.06669",
       "license": "CC-BY-NC-SA-4.0",
       "format": "lerobot-v2",
-      "embodiment": ["agibot_g1"],
-      "task_types": ["pick_place", "pour", "multi_task"],
+      "embodiment": [
+        "agibot_g1"
+      ],
+      "task_types": [
+        "pick_place",
+        "pour",
+        "multi_task"
+      ],
       "scale": {
         "episodes": 92214,
         "hours": 2976.0,
@@ -248,7 +349,14 @@
         }
       ],
       "demo_suitable": false,
-      "tags": ["manipulation", "bi_manual", "humanoid", "real_world", "multi_task", "large_scale"],
+      "tags": [
+        "manipulation",
+        "bi_manual",
+        "humanoid",
+        "real_world",
+        "multi_task",
+        "large_scale"
+      ],
       "forge_verified": false,
       "added_at": "2026-03-08"
     },
@@ -259,8 +367,13 @@
       "paper_url": "https://arxiv.org/abs/2212.06817",
       "license": "Apache-2.0",
       "format": "rlds",
-      "embodiment": ["google_robot"],
-      "task_types": ["pick_place", "push"],
+      "embodiment": [
+        "google_robot"
+      ],
+      "task_types": [
+        "pick_place",
+        "push"
+      ],
       "scale": {
         "episodes": 87212,
         "approximate": true
@@ -272,7 +385,12 @@
         }
       ],
       "demo_suitable": false,
-      "tags": ["manipulation", "real_world", "multi_task", "large_scale"],
+      "tags": [
+        "manipulation",
+        "real_world",
+        "multi_task",
+        "large_scale"
+      ],
       "forge_verified": false,
       "added_at": "2026-03-08"
     },
@@ -283,8 +401,17 @@
       "paper_url": "https://arxiv.org/abs/2307.00595",
       "license": "Research use",
       "format": "other",
-      "embodiment": ["franka", "ur5", "kuka", "flexiv"],
-      "task_types": ["pick_place", "manipulation", "multi_task"],
+      "embodiment": [
+        "franka",
+        "ur5",
+        "kuka",
+        "flexiv"
+      ],
+      "task_types": [
+        "pick_place",
+        "manipulation",
+        "multi_task"
+      ],
       "scale": {
         "episodes": 110000,
         "approximate": true
@@ -296,7 +423,13 @@
         }
       ],
       "demo_suitable": false,
-      "tags": ["manipulation", "contact_rich", "real_world", "multi_task", "large_scale"],
+      "tags": [
+        "manipulation",
+        "contact_rich",
+        "real_world",
+        "multi_task",
+        "large_scale"
+      ],
       "forge_verified": false,
       "added_at": "2026-03-08"
     },
@@ -307,8 +440,14 @@
       "paper_url": "https://arxiv.org/abs/2306.03310",
       "license": "CC-BY-4.0",
       "format": "hdf5",
-      "embodiment": ["franka"],
-      "task_types": ["pick_place", "drawer", "multi_task"],
+      "embodiment": [
+        "franka"
+      ],
+      "task_types": [
+        "pick_place",
+        "drawer",
+        "multi_task"
+      ],
       "scale": {
         "episodes": 4500,
         "hours": 10.0,
@@ -321,7 +460,11 @@
         }
       ],
       "demo_suitable": false,
-      "tags": ["manipulation", "simulation", "multi_task"],
+      "tags": [
+        "manipulation",
+        "simulation",
+        "multi_task"
+      ],
       "forge_verified": false,
       "added_at": "2026-03-08"
     },
@@ -332,8 +475,12 @@
       "paper_url": "https://arxiv.org/abs/2305.12821",
       "license": "Research use",
       "format": "other",
-      "embodiment": ["franka"],
-      "task_types": ["assembly"],
+      "embodiment": [
+        "franka"
+      ],
+      "task_types": [
+        "assembly"
+      ],
       "scale": {
         "episodes": 5000,
         "hours": 200.0,
@@ -347,7 +494,11 @@
         }
       ],
       "demo_suitable": false,
-      "tags": ["manipulation", "real_world", "multi_task"],
+      "tags": [
+        "manipulation",
+        "real_world",
+        "multi_task"
+      ],
       "forge_verified": false,
       "added_at": "2026-03-08"
     },
@@ -358,8 +509,15 @@
       "paper_url": "https://arxiv.org/abs/1909.12271",
       "license": "Research use",
       "format": "other",
-      "embodiment": ["franka"],
-      "task_types": ["pick_place", "push", "drawer", "multi_task"],
+      "embodiment": [
+        "franka"
+      ],
+      "task_types": [
+        "pick_place",
+        "push",
+        "drawer",
+        "multi_task"
+      ],
       "scale": {
         "episodes": 10000,
         "approximate": true
@@ -372,7 +530,11 @@
         }
       ],
       "demo_suitable": false,
-      "tags": ["manipulation", "simulation", "multi_task"],
+      "tags": [
+        "manipulation",
+        "simulation",
+        "multi_task"
+      ],
       "forge_verified": false,
       "added_at": "2026-03-08"
     },
@@ -383,8 +545,16 @@
       "paper_url": "https://arxiv.org/abs/1910.10897",
       "license": "MIT",
       "format": "lerobot",
-      "embodiment": ["sawyer"],
-      "task_types": ["pick_place", "push", "drawer", "assembly", "multi_task"],
+      "embodiment": [
+        "sawyer"
+      ],
+      "task_types": [
+        "pick_place",
+        "push",
+        "drawer",
+        "assembly",
+        "multi_task"
+      ],
       "scale": {
         "episodes": 50000,
         "approximate": true
@@ -396,7 +566,11 @@
         }
       ],
       "demo_suitable": false,
-      "tags": ["manipulation", "simulation", "multi_task"],
+      "tags": [
+        "manipulation",
+        "simulation",
+        "multi_task"
+      ],
       "forge_verified": false,
       "added_at": "2026-03-08"
     },
@@ -407,8 +581,12 @@
       "paper_url": "https://arxiv.org/abs/2210.06407",
       "license": "Apache-2.0",
       "format": "rlds",
-      "embodiment": ["xarm"],
-      "task_types": ["push"],
+      "embodiment": [
+        "xarm"
+      ],
+      "task_types": [
+        "push"
+      ],
       "scale": {
         "episodes": 600000,
         "hours": 2700.0,
@@ -421,7 +599,13 @@
         }
       ],
       "demo_suitable": false,
-      "tags": ["manipulation", "real_world", "language_conditioned", "large_scale", "single_task"],
+      "tags": [
+        "manipulation",
+        "real_world",
+        "language_conditioned",
+        "large_scale",
+        "single_task"
+      ],
       "forge_verified": false,
       "added_at": "2026-03-08"
     },
@@ -432,8 +616,14 @@
       "paper_url": "https://arxiv.org/abs/2202.02005",
       "license": "Apache-2.0",
       "format": "rlds",
-      "embodiment": ["widowx"],
-      "task_types": ["pick_place", "push", "multi_task"],
+      "embodiment": [
+        "widowx"
+      ],
+      "task_types": [
+        "pick_place",
+        "push",
+        "multi_task"
+      ],
       "scale": {
         "episodes": 25877,
         "approximate": true
@@ -445,7 +635,12 @@
         }
       ],
       "demo_suitable": false,
-      "tags": ["manipulation", "real_world", "language_conditioned", "multi_task"],
+      "tags": [
+        "manipulation",
+        "real_world",
+        "language_conditioned",
+        "multi_task"
+      ],
       "forge_verified": false,
       "added_at": "2026-03-08"
     },
@@ -456,8 +651,12 @@
       "paper_url": "https://arxiv.org/abs/2310.08864",
       "license": "Apache-2.0",
       "format": "rlds",
-      "embodiment": ["jaco"],
-      "task_types": ["manipulation"],
+      "embodiment": [
+        "jaco"
+      ],
+      "task_types": [
+        "manipulation"
+      ],
       "scale": {
         "episodes": 1085,
         "hours": 3.0,
@@ -474,7 +673,12 @@
         }
       ],
       "demo_suitable": false,
-      "tags": ["manipulation", "real_world", "language_conditioned", "single_task"],
+      "tags": [
+        "manipulation",
+        "real_world",
+        "language_conditioned",
+        "single_task"
+      ],
       "forge_verified": false,
       "added_at": "2026-03-08"
     },
@@ -485,8 +689,13 @@
       "paper_url": "https://arxiv.org/abs/2209.08959",
       "license": "CC-BY-4.0",
       "format": "rlds",
-      "embodiment": ["franka"],
-      "task_types": ["manipulation", "multi_task"],
+      "embodiment": [
+        "franka"
+      ],
+      "task_types": [
+        "manipulation",
+        "multi_task"
+      ],
       "scale": {
         "episodes": 3600,
         "hours": 7.0,
@@ -503,7 +712,12 @@
         }
       ],
       "demo_suitable": false,
-      "tags": ["manipulation", "real_world", "language_conditioned", "multi_task"],
+      "tags": [
+        "manipulation",
+        "real_world",
+        "language_conditioned",
+        "multi_task"
+      ],
       "forge_verified": false,
       "added_at": "2026-03-08"
     },
@@ -513,8 +727,12 @@
       "description": "Multi-arm manipulation dataset from Stanford ILIAD lab, converted to RLDS format.",
       "license": "Research use",
       "format": "rlds",
-      "embodiment": ["franka"],
-      "task_types": ["manipulation"],
+      "embodiment": [
+        "franka"
+      ],
+      "task_types": [
+        "manipulation"
+      ],
       "scale": {
         "approximate": true
       },
@@ -525,7 +743,10 @@
         }
       ],
       "demo_suitable": false,
-      "tags": ["manipulation", "real_world"],
+      "tags": [
+        "manipulation",
+        "real_world"
+      ],
       "forge_verified": false,
       "added_at": "2026-03-08"
     },
@@ -535,8 +756,12 @@
       "description": "Simple 2D T-block pushing task with 206 episodes. The canonical LeRobot demo dataset.",
       "license": "MIT",
       "format": "lerobot",
-      "embodiment": ["simulated"],
-      "task_types": ["push"],
+      "embodiment": [
+        "simulated"
+      ],
+      "task_types": [
+        "push"
+      ],
       "scale": {
         "episodes": 206,
         "approximate": false
@@ -550,7 +775,11 @@
       "demo_suitable": true,
       "demo_episodes": 206,
       "demo_source_index": 0,
-      "tags": ["manipulation", "simulation", "single_task"],
+      "tags": [
+        "manipulation",
+        "simulation",
+        "single_task"
+      ],
       "forge_verified": false,
       "added_at": "2026-03-08",
       "notes": "206 episodes — slightly above 100 but universally used as a tiny demo dataset"
@@ -562,8 +791,13 @@
       "paper_url": "https://arxiv.org/abs/2403.12945",
       "license": "CC-BY-4.0",
       "format": "lerobot",
-      "embodiment": ["franka"],
-      "task_types": ["pick_place", "manipulation"],
+      "embodiment": [
+        "franka"
+      ],
+      "task_types": [
+        "pick_place",
+        "manipulation"
+      ],
       "scale": {
         "episodes": 100,
         "approximate": false
@@ -577,7 +811,11 @@
       "demo_suitable": true,
       "demo_episodes": 100,
       "demo_source_index": 0,
-      "tags": ["manipulation", "real_world", "multi_task"],
+      "tags": [
+        "manipulation",
+        "real_world",
+        "multi_task"
+      ],
       "forge_verified": false,
       "added_at": "2026-03-08"
     },
@@ -588,8 +826,12 @@
       "paper_url": "https://arxiv.org/abs/2304.13705",
       "license": "MIT",
       "format": "lerobot",
-      "embodiment": ["aloha"],
-      "task_types": ["manipulation"],
+      "embodiment": [
+        "aloha"
+      ],
+      "task_types": [
+        "manipulation"
+      ],
       "scale": {
         "episodes": 50,
         "approximate": false
@@ -603,9 +845,386 @@
       "demo_suitable": true,
       "demo_episodes": 50,
       "demo_source_index": 0,
-      "tags": ["manipulation", "bi_manual", "real_world", "single_task"],
+      "tags": [
+        "manipulation",
+        "bi_manual",
+        "real_world",
+        "single_task"
+      ],
       "forge_verified": false,
       "added_at": "2026-03-08"
+    },
+    "robocasa": {
+      "id": "robocasa",
+      "name": "RoboCasa",
+      "description": "Large-scale simulated kitchen manipulation: ~100 human demos per task across 100+ atomic/composite tasks, expanded to ~100k+ trajectories with MimicGen in MuJoCo. A standard pretraining corpus behind GR00T.",
+      "paper_url": "https://arxiv.org/abs/2406.02523",
+      "license": "MIT",
+      "format": "hdf5",
+      "embodiment": [
+        "franka"
+      ],
+      "task_types": [
+        "pick_place",
+        "drawer",
+        "push",
+        "contact_rich",
+        "multi_task"
+      ],
+      "scale": {
+        "episodes": 100000,
+        "hours": 600.0,
+        "approximate": true
+      },
+      "sources": [
+        {
+          "type": "http",
+          "uri": "https://robocasa.ai/",
+          "notes": "Canonical download via robocasa download_datasets.py (robomimic-style HDF5)"
+        },
+        {
+          "type": "hf_hub",
+          "uri": "haosulab/RoboCasa",
+          "notes": "ManiSkill/SAPIEN-adapted mirror; LeRobot-converted versions also on the Hub"
+        }
+      ],
+      "demo_suitable": false,
+      "tags": [
+        "manipulation",
+        "simulation",
+        "contact_rich",
+        "multi_task",
+        "large_scale"
+      ],
+      "forge_verified": false,
+      "added_at": "2026-07-21",
+      "notes": "MimicGen-generated + human demos; kitchen-centric. LeRobot conversions widely available for easy ingest."
+    },
+    "maniskill": {
+      "id": "maniskill",
+      "name": "ManiSkill (v3)",
+      "description": "GPU-parallelized manipulation simulator and benchmark with millions of demonstration frames across diverse task families (pick-place, stacking, articulated objects, dexterous).",
+      "paper_url": "https://arxiv.org/abs/2410.00425",
+      "license": "Apache-2.0",
+      "format": "hdf5",
+      "embodiment": [
+        "franka",
+        "widowx",
+        "dexterous_hand"
+      ],
+      "task_types": [
+        "pick_place",
+        "push",
+        "drawer",
+        "contact_rich",
+        "multi_task"
+      ],
+      "scale": {
+        "episodes": 30000,
+        "hours": null,
+        "approximate": true
+      },
+      "sources": [
+        {
+          "type": "hf_hub",
+          "uri": "haosulab/ManiSkill_Demonstrations",
+          "notes": "Download per-task via `python -m mani_skill.utils.download_demo <env_id>`"
+        }
+      ],
+      "demo_suitable": false,
+      "tags": [
+        "manipulation",
+        "simulation",
+        "contact_rich",
+        "multi_task"
+      ],
+      "forge_verified": false,
+      "added_at": "2026-07-21",
+      "notes": "Widely-used sim benchmark; trajectory .h5 + json. Episode count varies by task family."
+    },
+    "calvin": {
+      "id": "calvin",
+      "name": "CALVIN",
+      "description": "Long-horizon, language-conditioned tabletop manipulation benchmark across four env splits (A/B/C/D); ~2M teleoperated trajectories with ~24k language-annotated.",
+      "paper_url": "https://arxiv.org/abs/2112.03227",
+      "license": "MIT",
+      "format": "other",
+      "embodiment": [
+        "franka"
+      ],
+      "task_types": [
+        "pick_place",
+        "drawer",
+        "push",
+        "multi_task"
+      ],
+      "scale": {
+        "episodes": 24000,
+        "hours": 24.0,
+        "approximate": true
+      },
+      "sources": [
+        {
+          "type": "http",
+          "uri": "https://github.com/mees/calvin",
+          "notes": "Download via dataset/download_data.sh (D, ABC, or ABCD splits); custom .npz frames"
+        }
+      ],
+      "demo_suitable": false,
+      "tags": [
+        "manipulation",
+        "simulation",
+        "language_conditioned",
+        "multi_task"
+      ],
+      "forge_verified": false,
+      "added_at": "2026-07-21",
+      "notes": "Reference long-horizon language-conditioned benchmark; ~24k of ~2M trajectories carry language labels."
+    },
+    "robomimic": {
+      "id": "robomimic",
+      "name": "robomimic",
+      "description": "Canonical imitation-learning / offline-RL manipulation benchmark: proficient- and mixed-human teleop demonstrations across sim and real tasks (Lift, Can, Square, Transport, Tool Hang).",
+      "paper_url": "https://arxiv.org/abs/2108.03298",
+      "license": "MIT",
+      "format": "hdf5",
+      "embodiment": [
+        "franka"
+      ],
+      "task_types": [
+        "pick_place",
+        "contact_rich",
+        "multi_task"
+      ],
+      "scale": {
+        "episodes": 6000,
+        "hours": null,
+        "approximate": true
+      },
+      "sources": [
+        {
+          "type": "http",
+          "uri": "https://robomimic.github.io/docs/datasets/robomimic_v0.1.html",
+          "notes": "Download via download_datasets.py; native robomimic HDF5"
+        }
+      ],
+      "demo_suitable": false,
+      "tags": [
+        "manipulation",
+        "simulation",
+        "contact_rich",
+        "multi_task"
+      ],
+      "forge_verified": false,
+      "added_at": "2026-07-21",
+      "notes": "The reference HDF5 layout much of the ecosystem (incl. MimicGen, RoboCasa) inherits."
+    },
+    "mimicgen": {
+      "id": "mimicgen",
+      "name": "MimicGen",
+      "description": "Auto-generated manipulation demonstrations: ~48k trajectories across 12 tasks synthesized from ~200 human demos, with diverse object/scene configs and multiple arms.",
+      "paper_url": "https://arxiv.org/abs/2310.17596",
+      "license": "CC-BY-4.0",
+      "format": "hdf5",
+      "embodiment": [
+        "franka",
+        "sawyer",
+        "ur5"
+      ],
+      "task_types": [
+        "pick_place",
+        "contact_rich",
+        "multi_task"
+      ],
+      "scale": {
+        "episodes": 48000,
+        "hours": null,
+        "approximate": true
+      },
+      "sources": [
+        {
+          "type": "hf_hub",
+          "uri": "amandlek/mimicgen_datasets",
+          "notes": "robomimic-format HDF5 (source/core/object groups)"
+        }
+      ],
+      "demo_suitable": false,
+      "tags": [
+        "manipulation",
+        "simulation",
+        "contact_rich",
+        "multi_task",
+        "large_scale"
+      ],
+      "forge_verified": false,
+      "added_at": "2026-07-21",
+      "notes": "Data-generation companion to robomimic; datasets CC-BY-4.0 (code is NVIDIA Source Code License)."
+    },
+    "robomind": {
+      "id": "robomind",
+      "name": "RoboMIND",
+      "description": "Multi-embodiment real-world teleoperation dataset: ~107k trajectories, 479 tasks, 96 object classes across Franka single-arm, AgileX dual-arm, UR-5e, and the Tien Kung humanoid.",
+      "paper_url": "https://arxiv.org/abs/2412.13877",
+      "license": "Apache-2.0",
+      "format": "hdf5",
+      "embodiment": [
+        "franka",
+        "ur5",
+        "agilex",
+        "tien_kung"
+      ],
+      "task_types": [
+        "pick_place",
+        "push",
+        "drawer",
+        "multi_task"
+      ],
+      "scale": {
+        "episodes": 107000,
+        "hours": 1400.0,
+        "approximate": true
+      },
+      "sources": [
+        {
+          "type": "hf_hub",
+          "uri": "x-humanoid-robomind/RoboMIND",
+          "notes": "Requires platform registration/agreement; LeRobot-format versions available"
+        }
+      ],
+      "demo_suitable": false,
+      "tags": [
+        "manipulation",
+        "bi_manual",
+        "humanoid",
+        "real_world",
+        "multi_task",
+        "large_scale",
+        "registration_required"
+      ],
+      "forge_verified": false,
+      "added_at": "2026-07-21",
+      "notes": "Access requires registration (BAAI/HF gated). Strong multi-embodiment + humanoid coverage."
+    },
+    "agibot_world_beta": {
+      "id": "agibot_world_beta",
+      "name": "AgiBot World Beta",
+      "description": "Large-scale real-world dual-arm humanoid manipulation: 1M+ trajectories, ~2,976 hours, 217 tasks and 87 skills with dexterous hands and mobile bases. Supersedes AgiBot World Alpha.",
+      "paper_url": "https://arxiv.org/abs/2503.06669",
+      "license": "CC-BY-NC-SA-4.0",
+      "format": "lerobot-v2",
+      "embodiment": [
+        "agibot_g1"
+      ],
+      "task_types": [
+        "pick_place",
+        "pour",
+        "contact_rich",
+        "multi_task"
+      ],
+      "scale": {
+        "episodes": 1000000,
+        "hours": 2976.0,
+        "approximate": true
+      },
+      "sources": [
+        {
+          "type": "hf_hub",
+          "uri": "agibot-world/AgiBotWorld-Beta"
+        }
+      ],
+      "demo_suitable": false,
+      "tags": [
+        "manipulation",
+        "bi_manual",
+        "humanoid",
+        "real_world",
+        "multi_task",
+        "large_scale",
+        "non_commercial"
+      ],
+      "forge_verified": false,
+      "added_at": "2026-07-21",
+      "notes": "Non-commercial license (CC-BY-NC-SA-4.0). Full-scale successor to agibot_world_alpha."
+    },
+    "robotwin": {
+      "id": "robotwin",
+      "name": "RoboTwin 2.0",
+      "description": "Scalable bimanual manipulation data generator and benchmark: 100k+ domain-randomized expert trajectories across 50 dual-arm tasks and five embodiments (incl. Aloha-AgileX).",
+      "paper_url": "https://arxiv.org/abs/2506.18088",
+      "license": "Apache-2.0",
+      "format": "hdf5",
+      "embodiment": [
+        "aloha",
+        "franka",
+        "ur5"
+      ],
+      "task_types": [
+        "pick_place",
+        "contact_rich",
+        "multi_task"
+      ],
+      "scale": {
+        "episodes": 100000,
+        "hours": null,
+        "approximate": true
+      },
+      "sources": [
+        {
+          "type": "hf_hub",
+          "uri": "TianxingChen/RoboTwin2.0",
+          "notes": "RoboTwin2_dataset (~80GB); LeRobot-compatible"
+        }
+      ],
+      "demo_suitable": false,
+      "tags": [
+        "manipulation",
+        "bi_manual",
+        "simulation",
+        "contact_rich",
+        "multi_task",
+        "large_scale"
+      ],
+      "forge_verified": false,
+      "added_at": "2026-07-21",
+      "notes": "Strong domain randomization; five arms (Franka, Piper, UR5, ARX-X5, Aloha-AgileX)."
+    },
+    "umi": {
+      "id": "umi",
+      "name": "UMI (Universal Manipulation Interface)",
+      "description": "In-the-wild human demonstrations collected with handheld grippers, yielding hardware-agnostic, deployable manipulation policies (incl. bimanual and dynamic tasks).",
+      "paper_url": "https://arxiv.org/abs/2402.10329",
+      "license": "MIT",
+      "format": "zarr",
+      "embodiment": [
+        "handheld_gripper",
+        "ur5"
+      ],
+      "task_types": [
+        "pick_place",
+        "push",
+        "contact_rich"
+      ],
+      "scale": {
+        "episodes": 1400,
+        "hours": null,
+        "approximate": true
+      },
+      "sources": [
+        {
+          "type": "http",
+          "uri": "https://umi-gripper.github.io/",
+          "notes": "Example datasets released as Zarr; see project page / GitHub"
+        }
+      ],
+      "demo_suitable": false,
+      "tags": [
+        "manipulation",
+        "real_world",
+        "contact_rich"
+      ],
+      "forge_verified": false,
+      "added_at": "2026-07-21",
+      "notes": "Human handheld-gripper collection paradigm (no robot needed to collect). Zarr-native."
     }
   }
 }
