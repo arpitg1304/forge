@@ -78,6 +78,15 @@ Use from this controlled vocabulary:
 
 `manipulation`, `bi_manual`, `mobile_manipulation`, `humanoid`, `language_conditioned`, `contact_rich`, `simulation`, `real_world`, `multi_task`, `single_task`, `large_scale`
 
+**Access-restriction tags** (surfaced as a dedicated "Access" filter and a badge
+in the registry HTML view — add when a dataset is not freely/openly downloadable):
+
+- `registration_required` — download is gated behind sign-up / an access agreement
+  (e.g. a HuggingFace gated repo or a platform login).
+- `non_commercial` — license forbids commercial use (e.g. CC-BY-NC-SA-4.0).
+
+Always also record the specifics in `notes`.
+
 ## Validation
 
 ```bash

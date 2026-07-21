@@ -22,6 +22,9 @@ VALID_TAGS = frozenset({
     "multi_task",
     "single_task",
     "large_scale",
+    # Access / usage restrictions (surfaced as a filter + badge in the HTML view)
+    "registration_required",
+    "non_commercial",
 })
 
 VALID_SOURCE_TYPES = frozenset({"gcs", "hf_hub", "http", "rsync"})
