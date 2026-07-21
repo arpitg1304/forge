@@ -93,6 +93,20 @@
     margin-top: 0.5rem;
     font-weight: 400;
   }
+  .facts-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-top: 1.1rem;
+    font-size: 0.9rem;
+    color: var(--accent-bright);
+    text-decoration: none;
+    border: 1px solid var(--border-hover);
+    padding: 0.4rem 0.85rem;
+    border-radius: var(--radius-sm);
+    transition: background 0.15s ease, border-color 0.15s ease;
+  }
+  .facts-link:hover { background: var(--accent-glow); border-color: var(--accent); }
 
   /* Stats */
   .stats-bar {
@@ -504,6 +518,7 @@
   <div class="logo">Forge</div>
   <h1>Dataset Registry</h1>
   <p class="subtitle">Curated robotics datasets for training, evaluation, and research</p>
+  <a class="facts-link" href="labels.html">⚒ Dataset facts labels &rarr;</a>
   <div class="stats-bar">
     <div class="stat-card">
       <div class="num">23</div>

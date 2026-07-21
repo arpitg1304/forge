@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "dataset": {
+    "hf_id": "lerobot/aloha_sim_transfer_cube_human",
+    "format_name": "LeRobot v3",
+    "registry_id": "aloha_sim_transfer_cube"
+  },
+  "scoring": {
+    "scored_at": "2026-07-21",
+    "forge_version": "0.1.0",
+    "episodes_total": 50,
+    "episodes_scored": 50,
+    "sampled": false,
+    "seed": 42
+  },
+  "quality": {
+    "score": 8.3,
+    "ci95": null,
+    "histogram": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      49,
+      0
+    ]
+  },
+  "facts": {
+    "mean_episode_seconds": 8.0,
+    "total_hours": 0.11,
+    "total_frames": 20000,
+    "fps": 50.0,
+    "embodiment": "ALOHA",
+    "cameras": {
+      "count": 1,
+      "summary": "1 (top, 480×640)"
+    },
+    "action_space": "14-dim",
+    "metrics": {
+      "dead_actions_pct": 0.2,
+      "static_frames_pct": 0.0,
+      "gripper_chatter_per_episode": 3.04,
+      "timestamp_jitter": "low"
+    }
+  },
+  "flags": {
+    "counts": {
+      "saturated": 50
+    },
+    "closer": "Occasionally pressed against the limits."
+  },
+  "footer": {
+    "license": "MIT"
+  }
+}
