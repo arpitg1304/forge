@@ -207,6 +207,38 @@ def _resolve_dataset_path(path_str: str, demo: bool = False) -> Path:
     return path
 
 
+def _registry_id_to_hf_url(path_str: str, demo: bool = False) -> str | None:
+    """Map a bare registry id to its ``hf://`` source URL, if it has one.
+
+    A registry id like ``metaworld`` otherwise skips the ``--quick`` and
+    size-guard branches in ``inspect`` (which only recognise HF URLs), so the
+    whole dataset downloads with no metadata-only option and no size warning.
+    Rewriting the id to ``hf://<repo>`` up front lets those branches apply
+    uniformly. Non-HF sources (gcs/http/…) return ``None`` so the caller falls
+    back to ``_resolve_dataset_path``, which keeps their existing handling.
+    """
+    if "/" in path_str or path_str.startswith((".", "/")):
+        return None
+    if Path(path_str).exists():
+        return None
+    try:
+        from forge.registry import DatasetRegistry
+    except ImportError:
+        return None
+    try:
+        entry = DatasetRegistry.get(path_str)
+        source = DatasetRegistry.get_source(path_str, demo=demo)
+    except Exception:
+        # Not a registry id (or no usable source) — let the normal path report it.
+        return None
+    if source.type != "hf_hub":
+        return None
+    console.print(
+        f"[cyan]Resolved from registry:[/cyan] {entry.name} ({entry.format})"
+    )
+    return f"hf://{source.uri}"
+
+
 def _quick_inspect_hub(path: str, output: str = "text") -> None:
     """Quick inspect a HuggingFace Hub dataset without downloading.
 
@@ -379,6 +411,13 @@ def inspect_cmd(
     """
     from forge.core.exceptions import ForgeError
     from forge.hub import is_hf_url
+
+    # Rewrite a bare registry id (e.g. `metaworld`) to its hf:// source so the
+    # --quick and size-guard branches below apply to registry ids too, not just
+    # explicit HF URLs. Non-HF-backed ids are left as-is for _resolve_dataset_path.
+    hf_from_registry = _registry_id_to_hf_url(path)
+    if hf_from_registry is not None:
+        path = hf_from_registry
 
     # Quick inspect for Hub datasets (metadata only, no download)
     if quick and is_hf_url(path):
