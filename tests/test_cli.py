@@ -171,3 +171,38 @@ class TestLocalCommand:
         )
         assert result.exit_code == 0, result.stdout
         assert "myorg/stack_lego" in result.stdout
+
+
+class TestRegistryIdToHfUrl:
+    """Registry ids should be rewritten to hf:// so --quick / size-guard apply."""
+
+    def test_hf_backed_id_resolves_to_hf_url(self):
+        from forge.cli import _registry_id_to_hf_url
+
+        # metaworld's source is hf_hub: lerobot/metaworld_mt50
+        assert _registry_id_to_hf_url("metaworld") == "hf://lerobot/metaworld_mt50"
+
+    def test_prefers_hf_over_other_sources(self):
+        from forge.cli import _registry_id_to_hf_url
+
+        # droid has both a gcs and an hf_hub source; get_source prefers hf_hub.
+        assert _registry_id_to_hf_url("droid") == "hf://cadene/droid"
+
+    def test_unknown_id_returns_none(self):
+        from forge.cli import _registry_id_to_hf_url
+
+        assert _registry_id_to_hf_url("definitely_not_a_dataset") is None
+
+    def test_repo_id_and_paths_are_ignored(self):
+        from forge.cli import _registry_id_to_hf_url
+
+        assert _registry_id_to_hf_url("lerobot/pusht") is None
+        assert _registry_id_to_hf_url("./local_dir") is None
+
+    def test_local_dir_shadows_registry_id(self, tmp_path, monkeypatch):
+        from forge.cli import _registry_id_to_hf_url
+
+        # A local directory named like a registry id must not be rewritten.
+        monkeypatch.chdir(tmp_path)
+        (tmp_path / "metaworld").mkdir()
+        assert _registry_id_to_hf_url("metaworld") is None
