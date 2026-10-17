@@ -1,122 +1,103 @@
-# Forge Video Quality (Tier 0)
+# Inspectable video quality
 
-Pixel-statistic quality metrics for the **video modality**, computed on a
-downscaled grayscale frame. This is **Tier 0** of the video extension: pure numpy,
-no model, no GPU, and no new dependencies beyond whatever the dataset reader
-already uses to decode frames. The metrics run in a single decode pass, so cost is
-dominated by the decode, not the math.
-
-`forge quality` stays **proprio-only by default** — Tier 0 is opt-in behind
-`--video`.
-
-## Metrics
-
-| Metric | What it catches | Flag |
-|---|---|---|
-| **Sharpness** (variance of Laplacian) | motion blur, defocus, compression mush | `blurry` |
-| **Exposure** (per-frame luma + pixel clipping) | over/under-exposed clips | `over_exposed` / `under_exposed` |
-| **Frozen frame** (consecutive-frame MAE) | encoder stalls, stuck streams, dead-static video | `frozen_frames` |
-| **Colorfulness** (Hasler–Süsstrunk) | scene-diversity input (not flagged) | — |
-
-Metrics are computed **per camera**, then rolled up to worst-case episode-level
-scalars for one-line filtering.
-
-## Usage
-
-### CLI
+Video checks remain separate from the proprioception score. They describe image
+health and observation integrity, not task success or training usefulness.
+Results are versioned `video-v2-integrity`.
 
 ```bash
-# Proprio + Tier 0 video
-forge quality ./my_dataset --video
-
-# Subsample frames for speed (every 4th image-bearing frame)
-forge quality ./my_dataset --video --video-stride 4
-
-# Tune the analysis frame size and cap frames per camera
-forge quality ./my_dataset --video --video-downscale 96 --video-max-frames 200
-
-# Restrict to specific cameras
-forge quality ./my_dataset --video --video-cameras observation.images.top
-
-# Export — video fields land in the same per-episode report rows
-forge quality ./my_dataset --video --export report.json
+forge quality ./dataset --video --visualize --export quality.json
+forge quality ./dataset --video --video-level motion --video-stride 4 \
+  --video-max-frames 200 --visualize --export quality.json
 ```
 
-### Library
+## Integrity and frame-drop estimates
 
-```python
-from forge.quality.video import VideoQualityAnalyzer, VideoQualityConfig
+Every episode observation is inspected for camera references and timestamps,
+including observations skipped by image sampling or beyond the decode cap.
+For each selected/declared camera, or a camera discovered during iteration:
 
-analyzer = VideoQualityAnalyzer(VideoQualityConfig(downscale=128, sample_stride=2))
-video = analyzer.analyze_episode(episode)   # VideoQuality | None
-print(video.min_sharpness, video.flags)
-for name, cam in video.per_camera.items():
-    print(name, cam.blurry_fraction, cam.frozen_fraction)
-```
+- `expected_frames`: episode observations on which camera references are expected.
+- `present_frames`, `missing_frames`, `missing_fraction`: camera-reference availability.
+- `decode_attempts`, `decode_failures`, `invalid_frames`: sampled decode outcomes.
+- `num_frames`: valid decoded images included in pixel statistics.
+- `sampled_out_frames`, `capped_frames`: intentionally unexamined images, never counted as failures.
+- `decode_coverage`: valid decoded images divided by present references. This is analysis coverage, not a codec success rate; use failures/attempts for the latter.
+- `timestamp_coverage`, `effective_fps`, `timestamp_jitter_ratio`: support and observed cadence of episode timestamps.
+- `estimated_dropped_frames`, `estimated_drop_fraction`, `timestamp_gaps`, `max_frame_gap_s`: estimates from elapsed observation time and expected FPS.
 
-The `QualityAnalyzer` runs Tier 0 in the **same frame loop** as the proprio pass
-(one decode per episode) when given a `video_config`:
+A gap exceeds 1.5 expected frame periods. Its estimated missing count is
+`round(elapsed_seconds * expected_fps) - 1`. A `video_frame_drops` warning fires
+when any gap represents at least 3 missing observations, at least 0.2 seconds of
+missing time beyond one expected period, or when the estimated drop fraction
+exceeds 5%. The fraction is missing estimates / (valid transitions + missing
+estimates), and is withheld on incomplete/nonmonotonic timelines.
 
-```python
-from forge.quality import QualityAnalyzer
-from forge.quality.video import VideoQualityConfig
+Tune those alert criteria with `--video-drop-frames`, `--video-gap-seconds`, and
+`--video-drop-fraction`. Episode FPS is used by default; `--video-fps` is an
+explicit override. Python exposes `VideoQualityConfig.gap_factor` too.
 
-eq = QualityAnalyzer(video_config=VideoQualityConfig()).analyze_episode(episode)
-eq.video      # VideoQuality, attached to the EpisodeQuality
-eq.flags      # video flags are merged in alongside proprio flags
-```
+**These are observation-gap estimates, not verified camera capture drops.**
+Forge generally receives episode timestamps rather than independent camera PTS.
+Incorrect expected FPS or intentional lower-rate acquisition can also explain
+gaps. Missing camera references are separate from missing timestamp intervals;
+do not add those counts together. Asynchronous camera schemas need their own
+availability expectations before treating missing references as faults.
 
-## Report integration
+With no stored timestamps, FPS may supply an explicitly inferred event timebase,
+but drop detection abstains. With incomplete timestamps, estimates cover only
+supported pairs and are labeled partial. With no usable timebase, events retain
+frame indices and unknown seconds.
 
-`VideoQuality` attaches to `EpisodeQuality.video`. Headline scalars are flattened
-into the per-episode report row (`video_min_sharpness`, `video_blurry_fraction`,
-`video_frozen_fraction`, …), and video flags merge into `flags` — so they compose
-with `forge filter` for free, both as flags and as numeric thresholds:
+## Pixel and motion evidence
 
-```bash
-# Flags
-forge filter ./ds ./clean --exclude-flags blurry,frozen_frames
+Blur, exposure, near-identical images, cut candidates, missing references, decode
+failures, invalid pixels, resolution changes, invalid timestamps, and time gaps
+produce camera-scoped events. Frame indices are zero-based; `end_frame` is
+exclusive. Time boundaries are the first and last supporting sample, so an
+isolated sampled frame has a zero-length time span.
 
-# Numeric Tier 0 thresholds (trigger live video analysis automatically)
-forge filter ./ds ./clean --min-sharpness 80 --max-frozen 0.5
-forge filter ./ds ./clean --max-overexposed 0.25 --max-underexposed 0.25
+Pixel events on strided input describe sampled evidence, not verified continuous
+faults in the intervening images. Freeze durations use elapsed seconds when
+available (`--video-freeze-seconds`, default 0.5); the legacy sampled-run threshold
+is only a fallback without a timebase. A stationary scene can still look frozen.
 
-# Or read video fields straight from a report
-forge quality ./ds --video --export report.json
-forge filter ./ds ./clean --from-report report.json --min-sharpness 80
-```
+Gaps, camera absence, invalid data, decode errors, and resolution changes reset
+temporal comparisons. Blank/low-texture observations also reset optical flow.
+Motion magnitudes use actual elapsed time where supported; `mean_motion_px_s`
+provides pixels/second on the downscaled analysis frame. The existing
+`mean_motion` retains pixels per expected frame. Motion smoothness abstains when
+flow sequences are interrupted or irregular rather than joining disjoint motion.
 
-`--min-motion` is a Tier 1 metric (see below) and auto-triggers optical-flow analysis.
+Invalid/nonfinite pixels are excluded, never converted to black. Supported inputs
+are uint8 or floating grayscale/RGB/RGBA intensity images; depth/integer formats
+outside uint8 need separate metrics. The LeRobot v3 reader now raises on missing
+requested video frames rather than substituting black/nearby/last-frame images.
+Other readers that synthesize images can still hide failures before analysis.
 
-## Tier 1 — motion (`--video-level motion`)
+Whole-image thresholds remain heuristics. Downscaling, image texture, dark
+backgrounds, noise, and camera placement affect them. Calibrate per camera and
+analysis resolution; select cameras with `--video-cameras`. These changes do not
+add task-region masks, learned visibility, or camera/proprioception clock alignment.
 
-Classical optical flow (Farnebäck dense flow, opencv) on a small frame
-(`motion_downscale`, default 64). Requires the `[video]` extra; without opencv the
-metrics raise a helpful install error rather than a bare `ImportError`.
+## Reports and viewer
 
-| Metric | What it catches | Flag |
-|---|---|---|
-| **Motion magnitude** (mean flow, px/frame) | low-signal episodes where nothing moves | `no_motion` |
-| **Motion smoothness** (pixel-space LDLJ of the global-motion path) | shaky / jittery video, frame-drop-then-jump | `shaky` |
-| **Camera-vs-scene split** (global-affine fit; residual = object motion) | a moving wrist-cam vs an active scene | — |
-| **Shot/cut detection** (histogram discontinuity **and** flow spike) | corrupted / concatenated episodes (a robot episode has no cuts) | `cut_detected` |
+Episode JSON retains the nested `video` result: per-camera metrics, flags,
+events, configuration, timebase provenance, and availability. Flat `video_*`
+rollups remain for compatibility. Older flat reports load as `video-v1` without
+invented camera detail. `video_min_sharpness` now means the true minimum sampled
+sharpness across cameras, rather than the minimum camera-average value; recalibrate
+thresholds that depended on the old meaning.
 
-`no_motion` is decided at the **episode** level (the most-active camera must be
-below threshold), so one moving camera keeps the episode "in motion". A cut needs
-**both** a luma-histogram drop and a flow spike relative to the episode's median,
-so gradual content change isn't mistaken for a cut. Optical flow against a
-blank/uniform frame is skipped (meaningless, and dodges occasional decoder black
-frames).
+The viewer shows camera integrity summaries, camera-filtered event cards and
+lanes, and click-to-seek playback. Missing time is labeled explicitly. A failed
+image request displays an unavailable-frame placeholder. Video diagnostics do
+not contribute to the numeric proprioception score.
 
-```bash
-forge quality ./ds --video --video-level motion
-forge filter  ./ds ./clean --min-motion 0.1          # drop low-signal episodes
-forge filter  ./ds ./clean --exclude-flags cut_detected,shaky
-```
+Existing worst-camera defect rollups remain, with their aggregation documented
+in provenance. The `no_motion` rollup requires evaluable motion for every selected
+camera, and still describes only the analyzed sample. Review camera relevance
+and coverage before filtering episodes.
 
-## Roadmap
+## Performance
 
-- **Tier 2 (semantic)** — CLIP/SigLIP embeddings, semantic temporal coherence,
-  text–image alignment against the language instruction. `--video-level semantic`.
-
-See `VIDEO_QUALITY_PLAN.md` at the repo root for the full design.
+See the [CPU benchmark and reproduction command](../../../docs/reports/README.md#video-cpu-benchmark).

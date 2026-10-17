@@ -214,7 +214,7 @@ def _write_lerobot_v3(fs, root: str, *, episodes=2, frames=10) -> None:
         {
             "episode_index": [e for e in range(episodes) for _ in range(frames)],
             "index": list(range(n)),
-            "timestamp": [float(i % frames) / 10 for i in range(n)],
+            "timestamp": [float(i % frames) / info["fps"] for i in range(n)],
             "observation.state": [rng.randn(7).tolist() for _ in range(n)],
             "action": [rng.randn(7).tolist() for _ in range(n)],
         }

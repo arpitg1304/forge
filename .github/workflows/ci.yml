@@ -33,3 +33,26 @@ jobs:
         # (zarr v3 deprecation + missing rosbag fixture). Until those are
         # fixed in a separate PR, we gate CI on the MCAP-specific suite.
         run: pytest tests/test_mcap_*.py --no-cov -v
+
+  quality:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - name: Install quality test dependencies
+        run: pip install -e ".[dev,lerobot,video,visualize]"
+      - name: Run quality, viewer, reader, filter, and catalog tests
+        run: >-
+          pytest --no-cov -q
+          tests/test_quality.py tests/test_proprio_diagnostics.py
+          tests/test_quality_parallel.py tests/test_quality_visualize.py
+          tests/test_video_quality.py tests/test_video_motion.py tests/test_video_integrity.py
+          tests/test_filter.py tests/test_filter_video.py
+          tests/test_lerobot_v3_reader_video.py tests/test_lerobot_v3_video_cache.py
+          tests/test_catalog.py tests/test_catalog_dedup.py

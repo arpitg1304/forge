@@ -205,7 +205,7 @@ class TestGripperChatter:
     def test_no_chatter(self):
         actions = np.zeros((100, 7))
         actions[:, -1] = np.where(np.arange(100) < 50, 0.0, 1.0)  # One transition
-        config = QualityConfig()
+        config = QualityConfig(gripper_dim=-1)
         count, rate, is_chat = gripper_chatter(actions, 100 / 30.0, config)
         assert count == 1
         assert not is_chat
@@ -214,14 +214,14 @@ class TestGripperChatter:
         actions = np.zeros((100, 7))
         # Toggle every frame
         actions[:, -1] = np.tile([0.0, 1.0], 50)
-        config = QualityConfig()
+        config = QualityConfig(gripper_dim=-1)
         count, rate, is_chat = gripper_chatter(actions, 100 / 30.0, config)
         assert count == 99
         assert is_chat
 
     def test_constant_gripper(self):
         actions = np.zeros((100, 7))
-        config = QualityConfig()
+        config = QualityConfig(gripper_dim=-1)
         count, rate, is_chat = gripper_chatter(actions, 100 / 30.0, config)
         assert count == 0
         assert not is_chat
@@ -501,7 +501,7 @@ class TestAnalyzer:
 
     def test_chattery_episode_flagged(self):
         ep = make_chattery_episode()
-        analyzer = QualityAnalyzer()
+        analyzer = QualityAnalyzer(gripper_dim=-1)
         eq = analyzer.analyze_episode_arrays(**ep)
         assert eq.is_chattery
         assert "gripper_chatter" in eq.flags
@@ -549,7 +549,7 @@ class TestAnalyzer:
             fps=30.0,
         )
         assert "nan_in_actions" in eq.flags
-        assert eq.overall_score is not None
+        assert eq.overall_score is None
 
 
 class TestQualityReport:

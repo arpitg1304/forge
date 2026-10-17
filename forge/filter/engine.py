@@ -11,7 +11,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from forge.core.exceptions import ForgeError, UnsupportedFormatError
+from forge.core.exceptions import ForgeError
 from forge.formats.registry import FormatRegistry
 from forge.quality.models import EpisodeQuality, QualityReport
 
@@ -20,7 +20,20 @@ logger = logging.getLogger(__name__)
 
 # Flags produced by the video analyzer — used to decide whether --exclude-flags
 # requires video analysis during live filtering.
-_VIDEO_FLAGS = frozenset({"blurry", "over_exposed", "under_exposed", "frozen_frames"})
+_VIDEO_FLAGS = frozenset(
+    {
+        "blurry",
+        "over_exposed",
+        "under_exposed",
+        "frozen_frames",
+        "video_camera_missing",
+        "video_decode_failure",
+        "video_invalid_pixels",
+        "video_resolution_change",
+        "video_frame_drops",
+        "video_invalid_timestamps",
+    }
+)
 # Flags that need Tier 1 (optical flow), which is pricier than Tier 0 pixel stats.
 _MOTION_FLAGS = frozenset({"no_motion", "shaky", "cut_detected"})
 
@@ -34,13 +47,13 @@ class FilterConfig:
     exclude_flags: list[str] | None = None
 
     # Video (Tier 0) numeric filters — keep episodes within these bounds.
-    min_sharpness: float | None = None          # reject if video min_sharpness < this
-    max_frozen_fraction: float | None = None    # reject if frozen_fraction > this
+    min_sharpness: float | None = None  # reject if video min_sharpness < this
+    max_frozen_fraction: float | None = None  # reject if frozen_fraction > this
     max_overexposed_fraction: float | None = None
     max_underexposed_fraction: float | None = None
 
     # Video (Tier 1) numeric filters — trigger optical-flow analysis.
-    min_motion: float | None = None             # reject if mean_motion < this (px/frame)
+    min_motion: float | None = None  # reject if mean_motion < this (px/frame)
 
     # Explicit episode selection
     include_episodes: list[str] | None = None
@@ -50,7 +63,7 @@ class FilterConfig:
     from_report: Path | None = None
 
     # Quality config for live analysis
-    gripper_dim: int = -1
+    gripper_dim: int | None = None
     fps: float = 30.0
     action_bounds: tuple[float, float] | None = None
 
@@ -282,9 +295,7 @@ class FilterEngine:
 
         # Quality-based filters require quality data
         if eq is None and self._needs_quality_analysis():
-            logger.warning(
-                "No quality data for %s — skipping quality filters", episode_id
-            )
+            logger.warning("No quality data for %s — skipping quality filters", episode_id)
             return True, []
 
         # Min quality score
@@ -342,9 +353,7 @@ class FilterEngine:
             and vq.frozen_fraction is not None
             and vq.frozen_fraction > c.max_frozen_fraction
         ):
-            reasons.append(
-                f"frozen {vq.frozen_fraction:.2f} > max {c.max_frozen_fraction:g}"
-            )
+            reasons.append(f"frozen {vq.frozen_fraction:.2f} > max {c.max_frozen_fraction:g}")
         if (
             c.max_overexposed_fraction is not None
             and vq.overexposed_fraction is not None

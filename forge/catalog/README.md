@@ -165,3 +165,12 @@ Snapshots + training-set export (Phase 4: `forge snapshot create/materialize`);
 frame/segment-level embeddings and Lance/ANN for >100k episodes (Phase 5);
 distributed execution, locking, compaction, and gc. The manifest convention is
 in place so gc becomes possible later, but it is not implemented.
+
+## Quality scorer compatibility
+
+New scores use `q-v2-proprio`. Gripper channels and physical command limits are
+explicit, and unsupported motion can leave `overall_score` null. Existing rows
+remain available with their original scorer version. Recompute quality reports
+and recalibrate thresholds before comparing old and new results. Re-ingesting
+an unchanged episode does not automatically refresh its catalog score. Detailed
+quality events are stored in report exports; see the [quality guide](../quality/README.md).

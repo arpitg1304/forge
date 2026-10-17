@@ -225,7 +225,7 @@ class TestFilterConfig:
         assert config.include_episodes is None
         assert config.exclude_episodes is None
         assert config.from_report is None
-        assert config.gripper_dim == -1
+        assert config.gripper_dim is None
         assert config.fps == 30.0
 
     def test_with_values(self):

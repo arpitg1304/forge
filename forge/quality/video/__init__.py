@@ -16,11 +16,12 @@ Usage::
 
 from forge.quality.video.analyzer import VideoQualityAnalyzer
 from forge.quality.video.config import VideoQualityConfig
-from forge.quality.video.models import CameraVideoQuality, VideoQuality
+from forge.quality.video.models import CameraVideoQuality, VideoEvent, VideoQuality
 
 __all__ = [
     "VideoQualityAnalyzer",
     "VideoQualityConfig",
     "VideoQuality",
     "CameraVideoQuality",
+    "VideoEvent",
 ]

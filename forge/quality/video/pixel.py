@@ -24,6 +24,20 @@ def _to_float_image(img: NDArray) -> NDArray:
     Accepts uint8 HWC/HW arrays or float arrays in either 0–1 or 0–255.
     """
     a = np.asarray(img)
+    if (
+        a.ndim not in (2, 3)
+        or min(a.shape[:2]) < 1
+        or (a.ndim == 3 and a.shape[2] not in (1, 3, 4))
+    ):
+        raise ValueError("Expected a nonempty grayscale/RGB/RGBA image")
+    if a.dtype != np.uint8 and not np.issubdtype(a.dtype, np.floating):
+        raise ValueError(
+            "Only uint8 or float intensity images are supported; depth needs separate metrics"
+        )
+    if not np.isfinite(a).all():
+        raise ValueError("Nonfinite pixels are invalid observations")
+    if a.min() < 0 or a.max() > 255:
+        raise ValueError("Image intensities must be in [0, 1] or [0, 255]")
     if a.dtype == np.uint8:
         return a.astype(np.float64)
     a = a.astype(np.float64)
@@ -31,7 +45,7 @@ def _to_float_image(img: NDArray) -> NDArray:
     finite = a[np.isfinite(a)]
     if finite.size and finite.max() <= 1.0 + 1e-6 and finite.min() >= -1e-6:
         a = a * 255.0
-    return np.nan_to_num(a, nan=0.0, posinf=255.0, neginf=0.0)
+    return a
 
 
 def _downscale(arr: NDArray, target: int) -> NDArray:
@@ -78,13 +92,7 @@ def laplacian_variance(gray: NDArray) -> float:
     if gray.shape[0] < 3 or gray.shape[1] < 3:
         return 0.0
     center = gray[1:-1, 1:-1]
-    lap = (
-        gray[:-2, 1:-1]
-        + gray[2:, 1:-1]
-        + gray[1:-1, :-2]
-        + gray[1:-1, 2:]
-        - 4.0 * center
-    )
+    lap = gray[:-2, 1:-1] + gray[2:, 1:-1] + gray[1:-1, :-2] + gray[1:-1, 2:] - 4.0 * center
     return float(lap.var())
 
 

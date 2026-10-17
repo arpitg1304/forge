@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from dataclasses import asdict, replace
 from pathlib import Path
-from typing import Iterator
 
 import numpy as np
 
@@ -16,11 +16,9 @@ from forge.quality.metrics import (
     dead_action_detection,
     gripper_chatter,
     log_dimensionless_jerk,
-    path_length,
     psd_band_energy,
     spectral_arc_length,
     state_conditioned_action_variance,
-    static_detection,
     timestamp_regularity,
 )
 from forge.quality.models import EpisodeQuality, QualityReport
@@ -31,7 +29,7 @@ class QualityAnalyzer:
 
     Usage::
 
-        analyzer = QualityAnalyzer(gripper_dim=-1, fps=30.0)
+        analyzer = QualityAnalyzer(fps=30.0)
         report = analyzer.analyze_dataset("./bridge_v2")
         print(report.overall_score)
     """
@@ -75,111 +73,161 @@ class QualityAnalyzer:
         Returns:
             EpisodeQuality with all computable metrics.
         """
+        from forge.quality.diagnostics import diagnose, indices
+
         eq = EpisodeQuality(episode_id=episode_id)
-        effective_fps = fps or self.config.fps
-
-        # Determine frame count
-        for arr in (actions, states, timestamps):
-            if arr is not None:
-                eq.num_frames = len(arr)
-                break
-
-        if eq.num_frames < self.config.min_frames:
-            return eq
-
-        # Compute dt for derivative metrics
-        if timestamps is not None and len(timestamps) > 1:
-            dt = float(np.mean(np.diff(timestamps)))
-        else:
-            dt = 1.0 / effective_fps
-
-        duration = (eq.num_frames - 1) * dt
-
-        # ── Action-based metrics ──
-        if actions is not None and actions.size > 0:
-            # Handle NaN/Inf
-            if np.any(~np.isfinite(actions)):
-                eq.flags.append("nan_in_actions")
-                actions = np.nan_to_num(actions, nan=0.0, posinf=0.0, neginf=0.0)
-
-            # 1. Dead actions
-            eq.dead_fraction, eq.dead_ranges = dead_action_detection(
-                actions, self.config
-            )
-
-            # 3. Gripper chatter
-            if actions.shape[1] > 1:
-                eq.gripper_chatter_count, eq.gripper_chatter_rate, eq.is_chattery = (
-                    gripper_chatter(actions, duration, self.config)
+        effective_fps = self.config.fps if fps is None else fps
+        if not np.isfinite(effective_fps) or effective_fps <= 0:
+            raise ValueError("fps must be finite and positive")
+        eq.provenance = {
+            "config": asdict(self.config),
+            "fps": effective_fps,
+            "timebase": "stored" if timestamps is not None else "inferred_from_fps",
+        }
+        arrays = {}
+        for name, value in (("actions", actions), ("states", states), ("timestamps", timestamps)):
+            if value is None:
+                continue
+            value = np.asarray(value, dtype=np.float64)
+            expected_ndim = 1 if name == "timestamps" else 2
+            if value.ndim != expected_ndim or (value.ndim == 2 and value.shape[1] == 0):
+                raise ValueError(
+                    f"{name} must have {'(T,)' if expected_ndim == 1 else '(T, D)'} shape"
                 )
-
-            # 6. Action saturation
-            sat_per_dim, eq.overall_saturation, eq.saturated_dims = action_saturation(
-                actions, self.config
+            arrays[name] = value
+        lengths = {len(x) for x in arrays.values()}
+        if len(lengths) > 1:
+            raise ValueError("actions, states, and timestamps must have matching frame counts")
+        eq.num_frames = next(iter(lengths), 0)
+        for name, value in arrays.items():
+            if not np.isfinite(value).all():
+                eq.flags.append(f"nan_in_{name}")
+                eq.metric_status[name] = (
+                    "invalid: nonfinite or missing samples; no zero substitution"
+                )
+        if eq.flags:
+            eq.metric_status["score"] = "unavailable: invalid input"
+            return eq
+        if eq.num_frames < self.config.min_frames:
+            eq.metric_status["score"] = "unavailable: insufficient frames"
+            return eq
+        actions, states = arrays.get("actions"), arrays.get("states")
+        timestamps = arrays.get("timestamps")
+        t = np.arange(eq.num_frames) / effective_fps if timestamps is None else timestamps
+        if np.any(np.diff(t) <= 0):
+            eq.flags.append("invalid_timestamps")
+            eq.metric_status["score"] = "unavailable: timestamps must strictly increase"
+            return eq
+        dt = float(np.mean(np.diff(t)))
+        duration = float(t[-1] - t[0])
+        eq.diagnostics, eq.events, statuses, eq.static = diagnose(
+            actions, states, t, self.config, effective_fps
+        )
+        eq.metric_status.update(statuses)
+        regular = True
+        if timestamps is not None:
+            eq.timestamps = timestamp_regularity(t, effective_fps)
+            regular = (
+                eq.timestamps.num_gaps == 0
+                and eq.timestamps.jitter_ratio <= self.config.jitter_warn_ratio
             )
-            eq.saturation_per_dim = sat_per_dim.tolist()
-
-            # 7. Static detection
-            eq.static = static_detection(actions, effective_fps, self.config)
-
-            # 8. Action entropy
-            ent_per_dim, eq.mean_entropy = action_entropy(actions)
-            eq.entropy_per_dim = ent_per_dim.tolist()
-
-            # 9b. PSD band energy (generalized chatter across all action dims)
-            bands = psd_band_energy(
-                actions,
-                effective_fps,
-                low_hz=self.config.psd_low_hz,
-                high_hz=self.config.psd_high_hz,
+            if eq.timestamps.num_gaps:
+                eq.flags.append("timestamp_gaps")
+            if abs(eq.timestamps.effective_fps / effective_fps - 1) > self.config.jitter_warn_ratio:
+                eq.flags.append("sample_rate_mismatch")
+        eq.metric_status["uniform_sampling"] = (
+            "available"
+            if regular
+            else "unavailable: irregular timestamps; spectral/derivative metrics skipped"
+        )
+        if actions is not None:
+            eq.dead_fraction, eq.dead_ranges = dead_action_detection(actions, self.config)
+            eq.metric_status["dead_actions"] = (
+                "diagnostic: zero/repeated commands can be intentional"
             )
-            if bands is not None:
-                eq.psd_bands = bands
-                eq.psd_high_fraction = bands["high_fraction"]
-                if bands["high_fraction"] > self.config.psd_high_flag:
-                    eq.flags.append("psd_high_band_chatter")
-
-        # ── State-based metrics ──
-        if states is not None and states.size > 0:
-            if np.any(~np.isfinite(states)):
-                eq.flags.append("nan_in_states")
-                states = np.nan_to_num(states, nan=0.0, posinf=0.0, neginf=0.0)
-
-            # 2. LDLJ smoothness (joint space)
-            eq.ldlj = log_dimensionless_jerk(states, dt)
-
-            # 9a. SPARC smoothness (frequency-domain complement to LDLJ)
-            eq.sparc = spectral_arc_length(states, dt)
-
-            # 4. Path length (joint space)
-            eq.joint_path_length = path_length(states)
-
-        # If no states but actions available, compute LDLJ + SPARC from actions
-        if actions is not None and actions.size > 0:
-            if eq.ldlj is None:
-                eq.ldlj = log_dimensionless_jerk(actions, dt)
-            if eq.sparc is None:
-                eq.sparc = spectral_arc_length(actions, dt)
-
-        # 9c. State-conditioned action variance (proprio STAC analogue) —
-        # needs both states and actions of matching length.
-        if (
-            states is not None
-            and actions is not None
-            and states.size > 0
-            and actions.size > 0
-            and len(states) == len(actions)
-        ):
-            _per_frame, mean_var = state_conditioned_action_variance(
+            dims = self.config.gripper_dims
+            if dims is None:
+                dims = () if self.config.gripper_dim is None else (self.config.gripper_dim,)
+            dims = indices(dims, actions.shape[1], "gripper_dims")
+            for dim in dims:
+                count, rate, flagged = gripper_chatter(
+                    actions, duration, replace(self.config, gripper_dims=None, gripper_dim=dim)
+                )
+                eq.grippers[str(dim)] = {"transitions": count, "rate": rate, "is_chattery": flagged}
+            if eq.grippers:
+                eq.gripper_chatter_count = sum(g["transitions"] for g in eq.grippers.values())
+                eq.gripper_chatter_rate = max(g["rate"] for g in eq.grippers.values())
+                eq.is_chattery = any(g["is_chattery"] for g in eq.grippers.values())
+            eq.metric_status["gripper"] = (
+                "available: explicit channels"
+                if dims
+                else "not_applicable: no gripper channels configured"
+            )
+            sat, overall, saturated_dims = action_saturation(actions, self.config)
+            if self.config.action_bounds is not None or self.config.action_limits is not None:
+                eq.saturation_per_dim = sat.tolist()
+                eq.overall_saturation = overall
+                eq.saturated_dims = saturated_dims
+                eq.metric_status["saturation"] = "available: supplied command limits"
+            else:
+                eq.observed_range_edge_fraction = overall
+                eq.metric_status["saturation"] = (
+                    "unavailable: no supplied limits; observed_range_edge_fraction is descriptive only"
+                )
+            entropy, eq.mean_entropy = action_entropy(actions)
+            eq.entropy_per_dim = entropy.tolist()
+            if regular:
+                bands = psd_band_energy(
+                    actions, 1 / dt, low_hz=self.config.psd_low_hz, high_hz=self.config.psd_high_hz
+                )
+                if bands is not None:
+                    eq.psd_bands = bands
+                    eq.psd_high_fraction = bands["high_fraction"]
+                    if eq.psd_high_fraction > self.config.psd_high_flag:
+                        eq.flags.append("psd_high_band_chatter")
+            eq.metric_status["psd"] = (
+                "available"
+                if eq.psd_bands is not None
+                else "unavailable: sample rate or regularity cannot support configured bands"
+            )
+        # Never substitute command motion for a supplied stationary state trace.
+        positions = states
+        if states is not None:
+            dims = indices(
+                self.config.state_dims
+                if self.config.state_dims is not None
+                else range(states.shape[1]),
+                states.shape[1],
+                "state_dims",
+            )
+            scales = (
+                np.ones(states.shape[1])
+                if self.config.state_scales is None
+                else np.asarray(self.config.state_scales)
+            )
+            positions = states[:, dims] / scales[dims]
+            eq.joint_path_length = eq.diagnostics["path_length_scaled"]
+        elif self.config.action_semantics == "position":
+            positions = actions
+        if positions is not None and regular:
+            eq.ldlj = log_dimensionless_jerk(positions, dt)
+            eq.sparc = spectral_arc_length(positions, dt)
+        eq.metric_status["smoothness"] = (
+            (
+                "available: state positions"
+                if states is not None
+                else "available: commanded positions"
+            )
+            if eq.ldlj is not None
+            else "unavailable: no motion, no positional data, or irregular timing"
+        )
+        if states is not None and actions is not None:
+            _, eq.state_action_consistency = state_conditioned_action_variance(
                 states, actions, k=self.config.state_action_k
             )
-            eq.state_action_consistency = mean_var
-
-        # ── Timestamp metrics ──
-        if timestamps is not None and len(timestamps) > 1:
-            eq.timestamps = timestamp_regularity(timestamps, effective_fps)
-
-        # ── Composite score ──
+            eq.metric_status["state_action_consistency"] = (
+                "diagnostic: unnormalized within-episode neighbors; not a task-correctness score"
+            )
         eq.overall_score, eq.subscores, score_flags = composite_score(
             dead_fraction=eq.dead_fraction,
             ldlj_score=eq.ldlj,
@@ -192,7 +240,16 @@ class QualityAnalyzer:
             config=self.config,
         )
         eq.flags.extend(score_flags)
-
+        if any(e.kind == "tracking_stall_candidate" for e in eq.events):
+            eq.flags.append("tracking_stall_candidate")
+        eq.metric_status["score"] = (
+            "heuristic: not task success or training utility; missing components omitted"
+        )
+        if not eq.subscores or not regular or (states is not None and eq.ldlj is None):
+            eq.overall_score = None
+            eq.metric_status["score"] = (
+                "unavailable: no evaluable motion or irregular timebase; review diagnostics"
+            )
         return eq
 
     def analyze_episode(self, episode) -> EpisodeQuality:
@@ -213,26 +270,35 @@ class QualityAnalyzer:
         # Single pass: collect proprio arrays and, when enabled, feed video
         # frames into per-camera accumulators so the episode decodes only once.
         video_accums = (
-            self._video_analyzer.new_accumulators()
+            self._video_analyzer.new_accumulators(episode.fps, episode.cameras)
             if self._video_analyzer is not None
             else None
         )
-        image_frame_idx = -1
 
-        for frame in episode.frames():
-            if frame.action is not None:
-                actions_list.append(np.asarray(frame.action, dtype=np.float64))
-            if frame.state is not None:
-                states_list.append(np.asarray(frame.state, dtype=np.float64))
-            if frame.timestamp is not None:
-                timestamps_list.append(frame.timestamp)
-            if video_accums is not None and frame.images:
-                image_frame_idx += 1
-                self._video_analyzer.consume_frame(frame, video_accums, image_frame_idx)
+        for frame_index, frame in enumerate(episode.frames()):
+            actions_list.append(
+                None if frame.action is None else np.asarray(frame.action, dtype=np.float64)
+            )
+            states_list.append(
+                None if frame.state is None else np.asarray(frame.state, dtype=np.float64)
+            )
+            timestamps_list.append(frame.timestamp)
+            if video_accums is not None:
+                self._video_analyzer.consume_frame(frame, video_accums, frame_index)
 
-        actions = np.stack(actions_list) if actions_list else None
-        states = np.stack(states_list) if states_list else None
-        timestamps = np.array(timestamps_list) if timestamps_list else None
+        def aligned(values):
+            example = next((v for v in values if v is not None), None)
+            if example is None:
+                return None
+            return np.stack([np.full_like(example, np.nan) if v is None else v for v in values])
+
+        actions = aligned(actions_list)
+        states = aligned(states_list)
+        timestamps = (
+            np.array([np.nan if t is None else t for t in timestamps_list])
+            if any(t is not None for t in timestamps_list)
+            else None
+        )
 
         eq = self.analyze_episode_arrays(
             episode_id=episode.episode_id,
@@ -307,12 +373,8 @@ class QualityAnalyzer:
 
         # Aggregate scores
         if report.per_episode:
-            scores = [
-                eq.overall_score
-                for eq in report.per_episode
-                if eq.overall_score is not None
-            ]
-            report.overall_score = float(np.mean(scores)) if scores else 0.0
+            scores = [eq.overall_score for eq in report.per_episode if eq.overall_score is not None]
+            report.overall_score = float(np.mean(scores)) if scores else None
 
             # Aggregate subscores
             all_subscore_keys = set()
@@ -320,18 +382,12 @@ class QualityAnalyzer:
                 all_subscore_keys.update(eq.subscores.keys())
 
             for key in all_subscore_keys:
-                vals = [
-                    eq.subscores[key]
-                    for eq in report.per_episode
-                    if key in eq.subscores
-                ]
+                vals = [eq.subscores[key] for eq in report.per_episode if key in eq.subscores]
                 if vals:
                     report.subscores[key] = float(np.mean(vals))
 
         # Generate flags and recommendations
-        report.flags, report.recommendations = _generate_recommendations(
-            report, self.config
-        )
+        report.flags, report.recommendations = _generate_recommendations(report, self.config)
 
         return report
 
@@ -353,21 +409,19 @@ def _generate_recommendations(
 
     if "gripper_chatter" in flagged:
         n = len(flagged["gripper_chatter"])
-        flags.append(
-            f"{n} episodes with gripper chatter (rate > {config.chatter_threshold}/sec)"
-        )
+        flags.append(f"{n} episodes with gripper chatter (rate > {config.chatter_threshold}/sec)")
         recs.append(
             f"Review gripper threshold or filter: forge filter --max-gripper-chatter {config.chatter_threshold}"
         )
 
     if "mostly_static" in flagged:
         n = len(flagged["mostly_static"])
-        flags.append(f"{n} episodes mostly static (>50% idle)")
-        recs.append("Run: forge filter --min-active-fraction 0.5")
+        flags.append(f"{n} episodes with sustained position holds (>50% observed time)")
+        recs.append("Review motion-pause events; waiting and contact may be intentional.")
 
     if "dead_actions" in flagged:
         n = len(flagged["dead_actions"])
-        flags.append(f"{n} episodes with dead actions (>10% zero-action frames)")
+        flags.append(f"{n} episodes with zero/repeated commands (>10% of frames)")
 
     if "timestamp_jitter" in flagged:
         n = len(flagged["timestamp_jitter"])
@@ -381,6 +435,14 @@ def _generate_recommendations(
         n = len(flagged["saturated"])
         flags.append(f"{n} episodes with action saturation (>30% at bounds)")
 
+    if "tracking_stall_candidate" in flagged:
+        flags.append(
+            f"{len(flagged['tracking_stall_candidate'])} episodes with position-tracking stall candidates"
+        )
+        recs.append(
+            "Review command/state mapping, controller latency, and contact before rejecting data."
+        )
+
     if "psd_high_band_chatter" in flagged:
         n = len(flagged["psd_high_band_chatter"])
         flags.append(
@@ -388,7 +450,7 @@ def _generate_recommendations(
             f"(>{int(config.psd_high_flag * 100)}% energy above {config.psd_high_hz:g} Hz)"
         )
 
-    if report.overall_score < 6.0 and report.num_episodes > 0:
+    if report.overall_score is not None and report.overall_score < 6.0 and report.num_episodes > 0:
         recs.append(
             f"Dataset quality is low ({report.overall_score:.1f}/10). Consider: forge filter --min-quality 6.0"
         )
