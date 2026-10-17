@@ -119,27 +119,20 @@ For complex conversions, generate a YAML config: `forge inspect ds/ --generate-c
 
 ## Score & clean
 
-<b>Quality</b> — score each episode 0–10 from proprioception alone (no video needed), on 8 research-backed metrics.
+<b>Quality</b> — inspect motion, timing, and optional video checks. The 0–10 score is a heuristic; unavailable scores remain null.
 
 ```bash
-forge quality ./my_dataset
-forge quality ./my_dataset --video --video-level motion    # also score camera streams
+forge quality ./my_dataset --visualize --export quality.json
+forge quality ./my_dataset --video --video-level motion --visualize
 ```
 
-<details>
-<summary>The 8 metrics</summary>
+- Detect held commands, measured-motion pauses, direction reversals, and timestamp gaps.
+- Inspect smoothness, action entropy, and path length. Configure gripper channels and physical action limits explicitly.
+- Enable tracking-stall candidates with known absolute-position action/state mappings.
+- Add camera coverage, decode failures, blur, exposure, freeze candidates, and estimated observation gaps with `--video`. Requires `[video]`.
+- Review evidence on camera timelines and action/state plots. A flag is a review candidate, not a task-failure label.
 
-- **Smoothness (LDLJ)** — jerk-based smoothness (Hogan & Sternad, 2009)
-- **Dead actions** — zero/constant action detection (Kim et al. "OpenVLA", 2024)
-- **Gripper chatter** — rapid open/close transitions (Sakr et al., 2024)
-- **Static detection** — idle periods (Liu et al. "SCIZOR", 2025)
-- **Timestamp regularity** — dropped frames and frequency jitter
-- **Action saturation** — time spent at hardware limits
-- **Action entropy** — diversity vs repetitiveness (Belkhale et al. "DemInf", 2025)
-- **Path length** — wandering / hesitation in joint space
-
-`--video` adds pixel metrics (blur, exposure, frozen frames) and, at `--video-level motion`, optical-flow motion, camera-vs-scene split, and shot-cut detection. Needs `[video]`. Details: [quality](forge/quality/README.md) · [video quality](forge/quality/video/README.md).
-</details>
+Details: [quality](forge/quality/README.md) · [video quality](forge/quality/video/README.md) · [viewer](forge/visualize/README.md) · [validation and benchmarks](docs/reports/README.md).
 
 <b>Lint</b> — check dataset *hygiene* (missing task strings, ambiguous cameras, low-res / single-view, missing action fields) against HuggingFace's LeRobot guidelines. Exits non-zero, so it drops into CI.
 

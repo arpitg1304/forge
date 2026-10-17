@@ -52,7 +52,7 @@ if TYPE_CHECKING:
 
 
 # Global video frame cache for efficient sequential access
-_video_cache: dict[str, "VideoFrameCache"] = {}
+_video_cache: dict[str, VideoFrameCache] = {}
 _video_cache_lock = Lock()
 
 
@@ -87,6 +87,9 @@ class VideoFrameCache:
             self._total_frames = self._stream.frames or 0
             return True
         except Exception:
+            if self._container is not None:
+                self._container.close()
+            self._container = self._stream = self._decoder = None
             return False
 
     def _frame_index_of(self, frame: Any) -> int:
@@ -112,53 +115,42 @@ class VideoFrameCache:
                 del self._frame_cache[k]
 
     def get_frame(self, frame_idx: int, dims: tuple[int, int, int] = (480, 640, 3)) -> Any:
-        """Get a frame, using cache or sequential decode."""
-        import numpy as np
+        """Return the requested decoded frame; never fabricate pixels on failure.
 
+        ``dims`` remains accepted for caller compatibility. A missing/undecodable
+        frame raises ValueError so quality analysis can record the failure and
+        viewers can display an unavailable-frame placeholder.
+        """
         with self._lock:
             if frame_idx in self._frame_cache:
                 return self._frame_cache[frame_idx]
-
             if not self._open():
-                return np.zeros(dims, dtype=np.uint8)
-
+                raise ValueError(f"Cannot open video: {self.video_path}")
             try:
-                # Seek when going backwards, jumping far ahead, or starting fresh.
                 if (
                     self._decoder is None
                     or frame_idx < self._current_frame_idx
                     or frame_idx > self._current_frame_idx + 30
                 ):
                     self._seek_to_frame(frame_idx)
-
-                last_img = None
                 for frame in self._decoder:
                     fi = self._frame_index_of(frame)
                     self._current_frame_idx = fi
                     img = frame.to_ndarray(format="rgb24")
                     self._frame_cache[fi] = img
-                    last_img = img
                     self._prune(frame_idx)
-
                     if fi == frame_idx:
                         return img
                     if fi > frame_idx:
-                        # Overshot (target frame absent / PTS rounding) — return
-                        # the closest frame we have rather than a black frame.
-                        return self._frame_cache.get(frame_idx, img)
-
-                # Decoder exhausted before reaching the target. Return the last
-                # real frame instead of black so a short/edge read can't masquerade
-                # as a scene cut or frozen frame downstream.
+                        raise ValueError(
+                            f"Requested video frame {frame_idx} is absent (next decoded index {fi})"
+                        )
+                raise ValueError(f"Video ended before requested frame {frame_idx}")
+            except Exception as exc:
                 self._decoder = None
-                if frame_idx in self._frame_cache:
-                    return self._frame_cache[frame_idx]
-                if last_img is not None:
-                    return last_img
-                return np.zeros(dims, dtype=np.uint8)
-
-            except Exception:
-                return np.zeros(dims, dtype=np.uint8)
+                raise ValueError(
+                    f"Cannot decode frame {frame_idx} from {self.video_path}: {exc}"
+                ) from exc
 
     def _seek_to_frame(self, target_frame: int) -> None:
         """Seek to (a keyframe at or before) a frame position.
@@ -1144,9 +1136,11 @@ class LeRobotV3Reader:
         # Get camera info from info.json for dimensions
         info_path = dataset_path / "meta" / "info.json"
         camera_features: dict[str, dict] = {}
+        dataset_fps = None
         if info_path.exists():
             with open(info_path) as f:
                 info = json.load(f)
+                dataset_fps = info.get("fps")
                 for key, spec in info.get("features", {}).items():
                     if spec.get("dtype") == "video":
                         camera_features[key] = spec
@@ -1381,6 +1375,17 @@ class LeRobotV3Reader:
         return Episode(
             episode_id=episode_id,
             language_instruction=language,
+            fps=dataset_fps,
+            cameras={
+                key.split(".")[-1]: CameraInfo(
+                    name=key.split(".")[-1],
+                    height=spec.get("shape", [480, 640, 3])[0],
+                    width=spec.get("shape", [480, 640, 3])[1],
+                    channels=3,
+                    storage="mp4",
+                )
+                for key, spec in camera_features.items()
+            },
             _frame_loader=load_frames,
         )
 

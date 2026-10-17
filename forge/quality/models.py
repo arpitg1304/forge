@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field, fields
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -35,11 +35,34 @@ class StaticResult:
 
 
 @dataclass
+class QualityEvent:
+    """Review candidate on [start_frame, end_frame), with absolute data times."""
+
+    kind: str
+    start_frame: int
+    end_frame: int
+    start_time_s: float
+    end_time_s: float
+    channels: list[int] = field(default_factory=list)
+
+    @property
+    def duration_s(self) -> float:
+        return self.end_time_s - self.start_time_s
+
+
+@dataclass
 class EpisodeQuality:
     """Quality metrics for a single episode."""
 
     episode_id: str
     num_frames: int = 0
+    scorer_version: str = "q-v2-proprio"
+    metric_status: dict[str, str] = field(default_factory=dict)
+    provenance: dict = field(default_factory=dict)
+    events: list[QualityEvent] = field(default_factory=list)
+    diagnostics: dict[str, float | int | None] = field(default_factory=dict)
+    grippers: dict[str, dict] = field(default_factory=dict)
+    observed_range_edge_fraction: float | None = None
 
     # Metric 1: Dead actions
     dead_fraction: float | None = None
@@ -88,35 +111,52 @@ class EpisodeQuality:
     flags: list[str] = field(default_factory=list)
 
     # Video modality (Tier 0 pixel metrics) — populated only with --video.
-    video: "VideoQuality | None" = None
+    video: VideoQuality | None = None
 
     @property
     def is_flagged(self) -> bool:
         return len(self.flags) > 0
 
     def to_dict(self) -> dict:
-        d: dict = {
-            "episode_id": self.episode_id,
-            "num_frames": self.num_frames,
-            "overall_score": self.overall_score,
-            "ldlj": self.ldlj,
-            "sparc": self.sparc,
-            "dead_fraction": self.dead_fraction,
-            "gripper_chatter_rate": self.gripper_chatter_rate,
-            "joint_path_length": self.joint_path_length,
-            "overall_saturation": self.overall_saturation,
-            "mean_entropy": self.mean_entropy,
-            "psd_high_fraction": self.psd_high_fraction,
-            "state_action_consistency": self.state_action_consistency,
-            "flags": self.flags,
-        }
+        d = asdict(self)
+        d.pop("video")
         if self.static is not None:
             d["static_fraction"] = self.static.static_fraction
         if self.timestamps is not None:
             d["jitter_ratio"] = self.timestamps.jitter_ratio
         if self.video is not None:
             d.update(self.video.to_flat_dict())
+            d["video"] = self.video.to_dict()
         return d
+
+    @classmethod
+    def from_dict(cls, data: dict) -> EpisodeQuality:
+        nested = {"static", "timestamps", "video", "events"}
+        kwargs = {
+            f.name: data[f.name] for f in fields(cls) if f.name in data and f.name not in nested
+        }
+        kwargs.setdefault("scorer_version", "q-v1")
+        eq = cls(**kwargs)
+        if data.get("static") is not None:
+            values = dict(data["static"])
+            values["static_segments"] = [tuple(x) for x in values["static_segments"]]
+            eq.static = StaticResult(**values)
+        elif data.get("static_fraction") is not None:
+            value = data["static_fraction"]
+            eq.static = StaticResult(value, value > 0.5, 0, [])
+        if data.get("timestamps") is not None:
+            eq.timestamps = TimestampResult(**data["timestamps"])
+        eq.events = [QualityEvent(**event) for event in data.get("events", [])]
+        if eq.dead_ranges is not None:
+            eq.dead_ranges = [tuple(x) for x in eq.dead_ranges]
+        from forge.quality.video.models import VideoQuality
+
+        eq.video = (
+            VideoQuality.from_dict(data["video"])
+            if data.get("video") is not None
+            else VideoQuality.from_flat_dict(data)
+        )
+        return eq
 
 
 @dataclass
@@ -125,7 +165,7 @@ class QualityReport:
 
     dataset_path: str
     num_episodes: int = 0
-    overall_score: float = 0.0
+    overall_score: float | None = None
     computed_at: str = ""
 
     subscores: dict[str, float] = field(default_factory=dict)
@@ -142,7 +182,9 @@ class QualityReport:
         return {
             "dataset_path": self.dataset_path,
             "num_episodes": self.num_episodes,
-            "overall_score": round(self.overall_score, 2),
+            "overall_score": round(self.overall_score, 2)
+            if self.overall_score is not None
+            else None,
             "computed_at": self.computed_at,
             "subscores": {k: round(v, 3) for k, v in self.subscores.items()},
             "per_episode": [ep.to_dict() for ep in self.per_episode],
@@ -177,24 +219,6 @@ class QualityReport:
         report.recommendations = data.get("recommendations", [])
 
         for ep_data in data.get("per_episode", []):
-            eq = EpisodeQuality(
-                episode_id=ep_data["episode_id"],
-                num_frames=ep_data.get("num_frames", 0),
-                overall_score=ep_data.get("overall_score"),
-                dead_fraction=ep_data.get("dead_fraction"),
-                ldlj=ep_data.get("ldlj"),
-                sparc=ep_data.get("sparc"),
-                gripper_chatter_rate=ep_data.get("gripper_chatter_rate"),
-                joint_path_length=ep_data.get("joint_path_length"),
-                overall_saturation=ep_data.get("overall_saturation"),
-                mean_entropy=ep_data.get("mean_entropy"),
-                psd_high_fraction=ep_data.get("psd_high_fraction"),
-                state_action_consistency=ep_data.get("state_action_consistency"),
-                flags=ep_data.get("flags", []),
-            )
-            from forge.quality.video.models import VideoQuality
-
-            eq.video = VideoQuality.from_flat_dict(ep_data)
-            report.per_episode.append(eq)
+            report.per_episode.append(EpisodeQuality.from_dict(ep_data))
 
         return report

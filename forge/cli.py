@@ -1123,7 +1123,7 @@ def stats_cmd(
     output: Path | None = typer.Option(None, "--output", "-o", help="Save stats to JSON file"),
     sample: int = typer.Option(0, "--sample", "-s", help="Sample N episodes (0 = all)"),
     quality: bool = typer.Option(False, "--quality", "-q", help="Include quality metrics"),
-    gripper_dim: int = typer.Option(-1, "--gripper-dim", help="Gripper action dimension index"),
+    gripper_dim: int | None = typer.Option(None, "--gripper-dim", help="Gripper action dimension index"),
     fps: float = typer.Option(30.0, "--fps", help="Recording FPS (fallback if no timestamps)"),
 ) -> None:
     """Compute and display dataset statistics.
@@ -1337,7 +1337,8 @@ def stats_cmd(
 
         report = analyzer.analyze_dataset(resolved_path, sample=sample)
 
-        console.print(f"  Overall Quality Score: [bold]{report.overall_score:.1f}[/bold] / 10")
+        score_label = f"{report.overall_score:.1f} / 10" if report.overall_score is not None else "N/A"
+        console.print(f"  Heuristic Quality Score: [bold]{score_label}[/bold]")
         console.print()
 
         for key, val in report.subscores.items():
@@ -1932,7 +1933,18 @@ def local_cmd(
 @app.command("quality")
 def quality_cmd(
     path: str = typer.Argument(..., help="Path to dataset (local or hf://org/repo)"),
-    gripper_dim: int = typer.Option(-1, "--gripper-dim", "-g", help="Gripper dimension index (-1 = last)"),
+    gripper_dim: int | None = typer.Option(None, "--gripper-dim", "-g", help="Gripper dimension index (-1 = last)"),
+    gripper_dims: str | None = typer.Option(None, "--gripper-dims", help="Comma-separated gripper action columns, e.g. 6,13; omit for no gripper scoring"),
+    action_semantics: str = typer.Option("unknown", "--action-semantics", help="unknown, position, velocity, or delta"),
+    tracking_pairs: str | None = typer.Option(None, "--tracking-pairs", help="Absolute-position action:state column pairs, e.g. 0:0,1:1; compatible units required"),
+    state_dims: str | None = typer.Option(None, "--state-dims", help="Position-state columns for motion diagnostics"),
+    state_scales: str | None = typer.Option(None, "--state-scales", help="Positive scale per original state column"),
+    pause_speed: float = typer.Option(0.001, "--pause-speed", help="Pause threshold in scaled position units/second"),
+    event_min_duration: float = typer.Option(0.5, "--event-min-duration", help="Minimum pause/hold/stall duration in seconds"),
+    tracking_error: float = typer.Option(0.05, "--tracking-error", help="Position mismatch threshold in scaled state units"),
+    tracking_lag: float = typer.Option(0.0, "--tracking-lag", help="Command-to-state latency in seconds"),
+    visualize: bool = typer.Option(False, "--visualize", help="Open web playback with quality-event timelines after scoring"),
+
     fps: float = typer.Option(30.0, "--fps", "-f", help="Fallback FPS if timestamps unavailable"),
     sample: int = typer.Option(0, "--sample", "-s", help="Analyze N episodes (0 = all)"),
     export: Path | None = typer.Option(None, "--export", "-e", help="Export full report to JSON"),
@@ -1940,12 +1952,17 @@ def quality_cmd(
     quick: bool = typer.Option(False, "--quick", "-q", help="Quick mode (sample 50 episodes)"),
     action_bounds: str | None = typer.Option(None, "--action-bounds", help="Known action bounds as 'min,max' (e.g., '-1,1')"),
     workers: int = typer.Option(1, "--workers", "-w", help="Parallel worker processes (1 = sequential)"),
-    video: bool = typer.Option(False, "--video", help="Also analyze camera streams (Tier 0 pixel metrics)"),
-    video_level: str = typer.Option("pixel", "--video-level", help="Video tier: 'pixel' (Tier 0) or 'motion' (Tier 1: optical flow). 'semantic' coming soon."),
+    video: bool = typer.Option(False, "--video", help="Also analyze camera integrity and pixel metrics"),
+    video_level: str = typer.Option("pixel", "--video-level", help="Video checks: 'pixel' or 'motion' (includes optical flow)"),
     video_downscale: int = typer.Option(128, "--video-downscale", help="Longest side (px) of the analysis frame"),
-    video_stride: int = typer.Option(1, "--video-stride", help="Analyze every Nth image-bearing frame"),
-    video_max_frames: int = typer.Option(0, "--video-max-frames", help="Cap analyzed frames per camera (0 = all)"),
+    video_stride: int = typer.Option(1, "--video-stride", help="Analyze every Nth episode observation"),
+    video_max_frames: int = typer.Option(0, "--video-max-frames", help="Cap decode attempts per camera (0 = all)"),
     video_cameras: str | None = typer.Option(None, "--video-cameras", help="Comma-separated camera names (default: all)"),
+    video_fps: float | None = typer.Option(None, "--video-fps", help="Explicit expected camera observation FPS; default: episode metadata"),
+    video_drop_frames: int = typer.Option(3, "--video-drop-frames", help="Estimated missing observations in one gap considered significant"),
+    video_gap_seconds: float = typer.Option(0.2, "--video-gap-seconds", help="Missing time beyond one expected frame that makes a gap significant"),
+    video_drop_fraction: float = typer.Option(0.05, "--video-drop-fraction", help="Estimated dropped-observation fraction that triggers a warning"),
+    video_freeze_seconds: float = typer.Option(0.5, "--video-freeze-seconds", help="Near-identical sampled-image span considered a sustained freeze candidate"),
 ) -> None:
     """Compute quality metrics on dataset episodes.
 
@@ -1976,16 +1993,32 @@ def quality_cmd(
     if action_bounds:
         try:
             parts = action_bounds.split(",")
+            if len(parts) != 2:
+                raise ValueError("Expected two bounds")
             bounds = (float(parts[0]), float(parts[1]))
         except (ValueError, IndexError):
             console.print("[red]Error:[/red] --action-bounds must be 'min,max' (e.g., '-1,1')")
             raise typer.Exit(1)
 
-    config = QualityConfig(
-        gripper_dim=gripper_dim,
-        fps=fps,
-        action_bounds=bounds,
-    )
+    try:
+        def parse_columns(value):
+            return tuple(int(x.strip()) for x in value.split(",")) if value is not None else None
+
+        pairs = None
+        if tracking_pairs is not None:
+            pairs = tuple(tuple(int(x) for x in item.split(":")) for item in tracking_pairs.split(","))
+            if any(len(pair) != 2 for pair in pairs):
+                raise ValueError("tracking pairs must use action:state syntax")
+        config = QualityConfig(
+            gripper_dim=gripper_dim, gripper_dims=parse_columns(gripper_dims), fps=fps,
+            action_bounds=bounds, action_semantics=action_semantics, tracking_pairs=pairs,
+            state_dims=parse_columns(state_dims),
+            state_scales=tuple(float(x) for x in state_scales.split(",")) if state_scales else None,
+            motion_speed_threshold=pause_speed, event_min_duration_s=event_min_duration,
+            tracking_error_threshold=tracking_error, tracking_lag_s=tracking_lag,
+        )
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
 
     # Video (Tier 0) config — only built when --video is passed.
     video_config = None
@@ -1999,13 +2032,18 @@ def quality_cmd(
         from forge.quality.video import VideoQualityConfig
 
         cam_list = [c.strip() for c in video_cameras.split(",")] if video_cameras else None
-        video_config = VideoQualityConfig(
-            level=video_level,
-            downscale=video_downscale,
-            sample_stride=video_stride,
-            max_frames=video_max_frames,
-            cameras=cam_list,
-        )
+        try:
+            video_config = VideoQualityConfig(
+                level=video_level, downscale=video_downscale,
+                sample_stride=video_stride, max_frames=video_max_frames,
+                cameras=cam_list, expected_fps=video_fps,
+                significant_drop_frames=video_drop_frames,
+                significant_gap_s=video_gap_seconds,
+                drop_fraction_flag=video_drop_fraction,
+                frozen_duration_s=video_freeze_seconds,
+            )
+        except ValueError as exc:
+            raise typer.BadParameter(str(exc)) from exc
 
     if quick and sample == 0:
         sample = 50
@@ -2121,7 +2159,7 @@ def quality_cmd(
     import numpy as np
 
     scores = [eq.overall_score for eq in report.per_episode if eq.overall_score is not None]
-    report.overall_score = float(np.mean(scores)) if scores else 0.0
+    report.overall_score = float(np.mean(scores)) if scores else None
 
     all_keys: set[str] = set()
     for eq in report.per_episode:
@@ -2142,7 +2180,9 @@ def quality_cmd(
 
     # Overall score with color
     score = report.overall_score
-    if score >= 8.0:
+    if score is None:
+        score_color = "dim"
+    elif score >= 8.0:
         score_color = "green"
     elif score >= 6.0:
         score_color = "yellow"
@@ -2151,7 +2191,9 @@ def quality_cmd(
 
     # Build the quality report panel
     lines: list[str] = []
-    lines.append(f"Overall Quality Score: [{score_color}]{score:.1f} / 10[/{score_color}]")
+    display_score = f"{score:.1f} / 10" if score is not None else "N/A — review diagnostic events"
+    lines.append(f"Heuristic Quality Score: [{score_color}]{display_score}[/{score_color}]")
+    lines.append(f"[dim]q-v2-proprio · {len(scores)}/{report.num_episodes} episodes scored; not a task-success grade[/dim]")
     lines.append("")
 
     # Subscores with bar visualization
@@ -2220,6 +2262,16 @@ def quality_cmd(
                 f"  State-action variance    mean={np.mean(sa_vals):.3f}  "
                 f"[dim](range {np.min(sa_vals):.2f}\u2013{np.max(sa_vals):.2f})[/dim]"
             )
+
+    from collections import Counter
+
+    event_counts = Counter(event.kind for eq in report.per_episode for event in eq.events)
+    if event_counts:
+        lines.append("")
+        lines.append("[bold]Proprioception events[/bold] [dim](review candidates, not verified failures)[/dim]")
+        for kind, count in sorted(event_counts.items()):
+            lines.append(f"  {kind.replace('_', ' '):<30} {count}")
+        lines.append("  [dim]Use --visualize to review intervals; --export saves timestamps and applicability.[/dim]")
 
     # Video (Tier 0) summary
     vid_eps = [eq for eq in report.per_episode if eq.video is not None]
@@ -2308,6 +2360,12 @@ def quality_cmd(
         console.print(f"[green]Flagged episodes saved to:[/green] {export_flagged}")
 
 
+    if visualize:
+        from forge.visualize.web_viewer import web_visualize
+
+        web_visualize(resolved_path, max_episodes=report.num_episodes, quality_report=report)
+
+
 @app.command("filter")
 def filter_cmd(
     source: str = typer.Argument(..., help="Path to dataset (local or hf://org/repo)"),
@@ -2322,10 +2380,10 @@ def filter_cmd(
     include_episodes: str | None = typer.Option(None, "--include-episodes", help="Only include these episode IDs (comma-separated)"),
     exclude_episodes: str | None = typer.Option(None, "--exclude-episodes", help="Exclude these episode IDs (comma-separated)"),
     from_report: Path | None = typer.Option(None, "--from-report", "-r", help="Use pre-computed quality report JSON"),
-    gripper_dim: int = typer.Option(-1, "--gripper-dim", "-g", help="Gripper dimension index (-1 = last)"),
+    gripper_dim: int | None = typer.Option(None, "--gripper-dim", "-g", help="Gripper dimension index (-1 = last)"),
     fps: float = typer.Option(30.0, "--fps", "-f", help="Fallback FPS if timestamps unavailable"),
     action_bounds: str | None = typer.Option(None, "--action-bounds", help="Known action bounds as 'min,max'"),
-    video_stride: int = typer.Option(1, "--video-stride", help="[video] Analyze every Nth image-bearing frame during live analysis"),
+    video_stride: int = typer.Option(1, "--video-stride", help="[video] Analyze every Nth episode observation during live analysis"),
 ) -> None:
     """Filter dataset episodes based on quality scores and flags.
 
@@ -2361,6 +2419,8 @@ def filter_cmd(
     if action_bounds:
         try:
             parts = action_bounds.split(",")
+            if len(parts) != 2:
+                raise ValueError("Expected two bounds")
             bounds = (float(parts[0]), float(parts[1]))
         except (ValueError, IndexError):
             console.print("[red]Error:[/red] --action-bounds must be 'min,max' (e.g., '-1,1')")

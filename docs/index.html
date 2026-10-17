@@ -771,7 +771,7 @@
       <div class="feature-title">Dataset Inspection</div>
       <div class="feature-desc">Auto-detect format, list episodes, cameras, action/state dimensions, FPS, and schema. Works with local paths and HuggingFace URIs.</div>
       <div class="feature-code">
-        <span class="prompt">$ </span><span class="cmd">forge inspect</span> <span class="arg">hf://lerobot/aloha_sim_cube</span>
+        <span class="prompt">$ </span><span class="cmd">forge inspect</span> <span class="arg">aloha_sim_transfer_cube</span>
       </div>
     </div>
 
@@ -781,9 +781,9 @@
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
       </div>
       <div class="feature-title">Quality Scoring</div>
-      <div class="feature-desc">Score every episode 0-10 with 8 research-backed metrics. Detect jerky demos, dead actions, gripper chatter, and idle periods from proprioception alone.</div>
+      <div class="feature-desc">Score every episode 0-10 with Inspectable quality metrics. Detect jerky demos, dead actions, gripper chatter, and idle periods from proprioception alone.</div>
       <div class="feature-code">
-        <span class="prompt">$ </span><span class="cmd">forge quality</span> <span class="arg">./my_dataset</span> <span class="flag">--export report.json</span>
+        <span class="prompt">$ </span><span class="cmd">forge quality</span> <span class="arg">./my_dataset</span> <span class="flag">--visualize --export report.json</span>
       </div>
     </div>
 
@@ -867,7 +867,7 @@
       <div class="feature-title">Action Tokenization</div>
       <div class="feature-desc">Turn continuous actions into the discrete tokens VLA models train on. Four built-in strategies (RT-1, OpenVLA, quantile, mu-law) and a comparator that benchmarks them on <em>your</em> data &mdash; measure, don't guess.</div>
       <div class="feature-code">
-        <span class="prompt">$ </span><span class="cmd">forge tokenize compare</span> <span class="arg">./my_dataset</span> <span class="flag">--export report.json</span>
+        <span class="prompt">$ </span><span class="cmd">forge tokenize compare</span> <span class="arg">./my_dataset</span> <span class="flag">--visualize --export report.json</span>
       </div>
     </div>
 
@@ -1410,8 +1410,8 @@
 <section id="quality">
   <div class="section-header">
     <div class="section-label">Quality</div>
-    <h2 class="section-title">8 research-backed metrics</h2>
-    <p class="section-subtitle">Score every episode 0-10 from proprioception data alone. No video processing needed.</p>
+    <h2 class="section-title">Inspectable quality metrics</h2>
+    <p class="section-subtitle">Measure motion and timing from proprioception. Scores are heuristic; unavailable results remain unscored.</p>
   </div>
 
   <div class="metrics-grid">
@@ -1425,19 +1425,19 @@
     </div>
     <div class="metric-pill">
       <div class="metric-dot" style="background: var(--orange)"></div>
-      <div><div class="name">Gripper Chatter</div><div class="desc">Rapid open/close cycles</div></div>
+      <div><div class="name">Gripper Chatter</div><div class="desc">Explicit gripper channels</div></div>
     </div>
     <div class="metric-pill">
       <div class="metric-dot" style="background: var(--purple)"></div>
-      <div><div class="name">Static Detection</div><div class="desc">Idle period detection</div></div>
+      <div><div class="name">Static Detection</div><div class="desc">Sustained low measured speed</div></div>
     </div>
     <div class="metric-pill">
       <div class="metric-dot" style="background: var(--green)"></div>
-      <div><div class="name">Timestamp Regularity</div><div class="desc">Dropped frames &amp; jitter</div></div>
+      <div><div class="name">Timestamp Regularity</div><div class="desc">Observation gaps &amp; jitter</div></div>
     </div>
     <div class="metric-pill">
       <div class="metric-dot" style="background: var(--teal)"></div>
-      <div><div class="name">Action Saturation</div><div class="desc">Time at hardware limits</div></div>
+      <div><div class="name">Action Saturation</div><div class="desc">Requires supplied limits</div></div>
     </div>
     <div class="metric-pill">
       <div class="metric-dot" style="background: var(--accent-bright)"></div>
@@ -1445,14 +1445,14 @@
     </div>
     <div class="metric-pill">
       <div class="metric-dot" style="background: var(--rose)"></div>
-      <div><div class="name">Path Length</div><div class="desc">Wandering &amp; hesitation</div></div>
+      <div><div class="name">Path Length</div><div class="desc">Measured position travel</div></div>
     </div>
   </div>
 
   <div style="text-align: center; margin-top: 2rem;">
     <div class="feature-code" style="display: inline-block; text-align: left; max-width: 600px;">
-      <span class="prompt">$ </span><span class="cmd">forge quality</span> <span class="arg">hf://lerobot/aloha_sim_cube</span> <span class="flag">--export report.json</span><br>
-      <span class="prompt">$ </span><span class="cmd">forge filter</span> <span class="arg">./dataset</span> <span class="arg">./filtered</span> <span class="flag">--min-quality 6.0</span> <span class="comment"># remove bad demos</span>
+      <span class="prompt">$ </span><span class="cmd">forge quality</span> <span class="arg">aloha_sim_transfer_cube</span> <span class="flag">--visualize --export report.json</span><br>
+      <span class="prompt">$ </span><span class="cmd">forge filter</span> <span class="arg">./dataset</span> <span class="arg">./filtered</span> <span class="flag">--min-quality 6.0</span> <span class="comment"># apply a calibrated threshold</span>
     </div>
   </div>
 </section>

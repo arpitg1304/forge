@@ -16,12 +16,13 @@ References:
 
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 from numpy.typing import NDArray
 
 from forge.quality.config import QualityConfig
 from forge.quality.models import StaticResult, TimestampResult
-
 
 # ── Metric 1: Dead Action Detection ─────────────────────────────
 
@@ -44,8 +45,11 @@ def dead_action_detection(
     # Zero actions
     is_zero = np.all(np.abs(actions) < eps, axis=1)
 
-    # Constant actions (same as first timestep)
-    is_constant = np.all(np.abs(actions - actions[0:1]) < eps, axis=1)
+    # Repeated neighboring commands, including plateaus later in the episode.
+    is_constant = np.zeros(len(actions), dtype=bool)
+    repeated = np.all(np.abs(np.diff(actions, axis=0)) <= eps, axis=1)
+    is_constant[:-1] |= repeated
+    is_constant[1:] |= repeated
 
     is_dead = is_zero | is_constant
     dead_fraction = float(np.mean(is_dead))
@@ -59,9 +63,7 @@ def dead_action_detection(
 # ── Metric 2: Log Dimensionless Jerk (LDLJ) ────────────────────
 
 
-def log_dimensionless_jerk(
-    positions: NDArray, dt: float
-) -> float | None:
+def log_dimensionless_jerk(positions: NDArray, dt: float) -> float | None:
     """Compute LDLJ smoothness metric.
 
     More negative = jerkier (higher jerk relative to velocity).
@@ -112,6 +114,10 @@ def gripper_chatter(
         Tuple of (chatter_count, chatter_rate, is_chattery).
     """
     gripper_dim = config.gripper_dim
+    if gripper_dim is None:
+        raise ValueError("Gripper dimension must be explicitly configured")
+    if not -actions.shape[1] <= gripper_dim < actions.shape[1]:
+        raise ValueError("Gripper dimension is outside action columns")
     gripper = actions[:, gripper_dim]
 
     # Auto-detect binarization threshold: midpoint of observed range
@@ -150,9 +156,7 @@ def path_length(positions: NDArray) -> float:
 # ── Metric 5: Timestamp Regularity ──────────────────────────────
 
 
-def timestamp_regularity(
-    timestamps: NDArray, expected_fps: float
-) -> TimestampResult:
+def timestamp_regularity(timestamps: NDArray, expected_fps: float) -> TimestampResult:
     """Analyze timestamp regularity and detect dropped frames.
 
     Args:
@@ -187,9 +191,7 @@ def timestamp_regularity(
 # ── Metric 6: Action Range Saturation ───────────────────────────
 
 
-def action_saturation(
-    actions: NDArray, config: QualityConfig
-) -> tuple[NDArray, float, list[int]]:
+def action_saturation(actions: NDArray, config: QualityConfig) -> tuple[NDArray, float, list[int]]:
     """Detect timesteps where actions hit their min/max bounds.
 
     Args:
@@ -199,7 +201,12 @@ def action_saturation(
     Returns:
         Tuple of (saturation_per_dim, overall_saturation, saturated_dims).
     """
-    if config.action_bounds is not None:
+    if config.action_limits is not None:
+        limits = np.asarray(config.action_limits)
+        if limits.shape != (actions.shape[1], 2):
+            raise ValueError("action_limits must have one (lower, upper) pair per action column")
+        a_min, a_max = limits[:, 0], limits[:, 1]
+    elif config.action_bounds is not None:
         a_min = np.full(actions.shape[1], config.action_bounds[0])
         a_max = np.full(actions.shape[1], config.action_bounds[1])
     else:
@@ -229,41 +236,22 @@ def action_saturation(
 # ── Metric 7: Static Episode Detection ──────────────────────────
 
 
-def static_detection(
-    actions: NDArray, fps: float, config: QualityConfig
-) -> StaticResult:
-    """Detect periods where the robot is not moving.
+def static_detection(actions: NDArray, fps: float, config: QualityConfig) -> StaticResult:
+    """Detect sustained position holds (legacy argument name: actions).
 
     Args:
-        actions: Shape (T, D) action array.
+        actions: Shape (T, D) position-state array, not raw velocity commands.
         fps: Recording frequency (for duration calculation).
         config: Quality configuration.
 
     Returns:
         StaticResult with static segments and statistics.
     """
-    action_norms = np.linalg.norm(actions, axis=1)
+    from forge.quality.diagnostics import diagnose
 
-    pct_value = np.percentile(action_norms, config.static_threshold_percentile)
-    threshold = 0.01 * pct_value if pct_value > 1e-10 else 1e-6
-
-    is_static = action_norms < threshold
-    static_fraction = float(np.mean(is_static))
-
-    # Find contiguous static runs
-    runs = _find_runs(is_static)
-    longest = max((end - start for start, end in runs), default=0)
-
-    # Convert to segments with duration
-    dt = 1.0 / fps if fps > 0 else 1.0
-    segments = [(s, e, (e - s) * dt) for s, e in runs]
-
-    return StaticResult(
-        static_fraction=static_fraction,
-        is_mostly_static=static_fraction > config.static_fraction_flag,
-        longest_static_run=longest,
-        static_segments=segments,
-    )
+    positions = np.asarray(actions, dtype=float)
+    _, _, _, result = diagnose(None, positions, np.arange(len(positions)) / fps, config, fps)
+    return result
 
 
 # ── Metric 8: Action Distribution Entropy ───────────────────────
@@ -341,9 +329,7 @@ def spectral_arc_length(
         return None
 
     velocity = np.gradient(positions, dt, axis=0)
-    speed = (
-        np.linalg.norm(velocity, axis=1) if velocity.ndim == 2 else np.abs(velocity)
-    )
+    speed = np.linalg.norm(velocity, axis=1) if velocity.ndim == 2 else np.abs(velocity)
     if speed.size < 4 or float(np.max(speed)) < 1e-12:
         return None
 

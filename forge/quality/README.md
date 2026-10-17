@@ -1,241 +1,108 @@
-# Forge Quality Metrics
+# Quality metrics
 
-Episode-level quality scoring for robotics demonstration data using proprioception signals only (joint states, actions, timestamps). No video or image processing.
+Analyze robot states, actions, and timestamps with NumPy. Video checks are optional
+and separate from the proprioception score.
 
-## Usage
-
-### CLI
+## Quick start
 
 ```bash
-# Local dataset
-forge quality ./my_dataset/
-
-# HuggingFace dataset
-forge quality hf://lerobot/aloha_sim_cube
-
-# With options
-forge quality ./my_dataset --gripper-dim 6 --fps 30 --export report.json
-forge quality ./my_dataset --export-flagged flagged.json
-forge quality ./my_dataset --sample 50 --quick
-
-# Known action bounds (tighter saturation detection)
-forge quality ./my_dataset --action-bounds -1.0,1.0
-
-# Via stats command
-forge stats ./my_dataset --quality
+forge quality ./dataset --visualize --export quality.json
+forge quality aloha_sim_transfer_cube --sample 5 --video --visualize
+forge quality ./dataset --gripper-dims 6,13 --action-bounds=-1,1
 ```
 
-### Python API
-
 ```python
-from forge.quality import QualityAnalyzer, QualityConfig
+from forge.quality import QualityAnalyzer
 
-# Analyze a full dataset
-analyzer = QualityAnalyzer(gripper_dim=-1, fps=30.0)
-report = analyzer.analyze_dataset("./my_dataset")
-print(report.overall_score)          # 7.8
-print(report.flagged_episodes)       # {"jerky": ["ep_42", ...], ...}
-report.to_json("quality_report.json")
+analyzer = QualityAnalyzer()  # No inferred gripper channel or physical limits.
+report = analyzer.analyze_dataset("./dataset")
+report.to_json("quality.json")
 
-# Analyze a single episode from numpy arrays
-eq = analyzer.analyze_episode_arrays(
-    episode_id="ep_0",
-    actions=actions_array,     # (T, D)
-    states=states_array,       # (T, D)
-    timestamps=timestamps,     # (T,)
-    fps=30.0,
+result = analyzer.analyze_episode_arrays(
+    "episode_0", actions=actions, states=states, timestamps=timestamps, fps=30.0
 )
-print(eq.overall_score)              # 8.4
-print(eq.flags)                      # []
-print(eq.is_flagged)                 # False
+print(result.overall_score)  # A heuristic score, or None when unavailable.
+print(result.events)
 ```
 
-## Metrics
+## Proprioception diagnostics and visual review (q-v2-proprio)
 
-### 1. Dead Action Detection
-Detects timesteps where all action dimensions are zero or constant, indicating teleoperation disconnects or recording artifacts.
+```bash
+forge quality ./my_dataset --sample 20 --visualize --export quality.json
 
-- **Output**: `dead_fraction` (0-1), `dead_ranges` (contiguous segments)
-- **Reference**: Kim et al. "OpenVLA" (2024) — filters degenerate transitions
+# Only for datasets with known absolute position actions and matching state units:
+forge quality ./my_dataset --action-semantics position \
+  --tracking-pairs 0:0,1:1 --tracking-error 0.05 --tracking-lag 0.1 \
+  --pause-speed 0.001 --event-min-duration 0.5 --visualize
 
-### 2. Log Dimensionless Jerk (LDLJ)
-Gold-standard smoothness metric from motor control. Computes jerk (third derivative of position) normalized by movement duration and peak velocity.
+# Explicit grippers for a known bimanual layout:
+forge quality ./my_dataset --gripper-dims 6,13
+```
 
-- **Output**: `ldlj_score` (more negative = jerkier; smooth: -6 to -8, jerky: -15 to -25)
-- **Scoring**: Sigmoid normalization with configurable center/scale
-- **Reference**: Hogan & Sternad (2009); validated by Scano et al., Frontiers in Neurology (2018)
+`--visualize` opens the existing local web viewer after scoring. It displays the analyzed episodes, event lanes, shaded action/state plots, episode flags, and metric availability. Click a span or choose an event to seek playback. The command serves the viewer until Ctrl+C. Green means **no event detected by enabled checks**, not task success; amber marks review candidates, red tracking-stall candidates, and gray unavailable data/gaps. Direction reversals are hidden by default; enable the checkbox to show these descriptive events in blue. Episode-wide flags without localized evidence remain listed separately.
 
-### 3. Gripper Chatter Detection
-Counts rapid open/close transitions that indicate noisy teleoperation input.
+| Diagnostic | Interpretation |
+|---|---|
+| `held_command_fraction` / `held_command` | Sustained adjacent repeated commands, measured over observed duration |
+| `static` / `motion_pause` | Sustained low measured speed, with frame and time intervals |
+| `direction_reversal_count` / `direction_reversal` | Sustained direction changes per selected state channel; descriptive, not a retry classifier |
+| `path_length_scaled`, `net_to_path_ratio` | Travel and endpoint displacement divided by travel; closed-loop tasks can naturally have a low ratio |
+| `tracking_error_mean`, `tracking_error_p95` | Maximum mapped command/state residual at each sample, with optional causal lag |
+| `tracking_stall_fraction` / `tracking_stall_candidate` | Low measured speed while mapped absolute-position commands remain far away; contact can cause this too |
+| `valid_duration_s`, `time_coverage`, `timestamp_gap` | Observed time support; events never bridge long recording gaps |
 
-- **Output**: `chatter_count`, `chatter_rate` (transitions/sec), `is_chattery`
-- **Reference**: Sakr et al. "Consistency Matters" (ACM THRI, 2024)
+Motion metrics assume **position** state columns. Select them with `--state-dims`; `--state-scales` supplies a positive divisor for every original state column, including unselected columns. Default scales are 1, so thresholds use native units (and native units/second for speed). For mixed units, supply meaningful scales before comparing episodes. Tracking pairs require compatible action/state units and explicit `position` semantics; vector shape does not establish correspondence. Tune duration, speed, error, and lag thresholds to the robot and task.
 
-### 4. Path Length
-Sum of step-to-step distances in joint space. Useful as a relative metric to compare episodes of the same task (longer = more wandering/hesitation).
+Scores are heuristics, not validated usefulness or success grades. Invalid/nonfinite data, nonmonotonic timestamps, irregular timebases, or degenerate measured motion can produce `overall_score: null`. Constant measured states never fall back to moving commands for smoothness. Missing gripper mappings and hardware limits are omitted from their subscores. Changing available subscores changes score comparability; **q-v1 thresholds should be recalibrated**.
 
-- **Output**: `joint_path_length`
-- **Note**: Not included in composite score (relative metric, not absolute quality)
-- **Reference**: Sakr et al. "Consistency Matters" (2024); Osa et al. (2018)
+JSON exports preserve `scorer_version`, configuration/timebase `provenance`, `metric_status`, raw `diagnostics`, static/timestamp results, and localized `events`. Each event has an inclusive `start_frame`, exclusive `end_frame`, timestamps, and affected state channels where applicable. Event duration is the difference between boundary timestamps, not the frame count divided by FPS. Legacy reports can still be loaded and are marked q-v1. Catalog scoring uses a new version; detailed events live in report exports.
 
-### 5. Timestamp Regularity
-Detects recording issues: dropped frames, irregular timing, frequency drift.
+Retries, task progress, contact success, and failure grades need task context or additional evidence. These checks intentionally expose motion candidates for review. Video checks are documented separately.
 
-- **Output**: `dt_mean`, `dt_std`, `jitter_ratio`, `num_gaps`, `gap_locations`, `effective_fps`
-- **Reference**: General signal integrity; HuggingFace LeRobot video encoding blog (2024)
+## Measurements and scoring
 
-### 6. Action Range Saturation
-Percentage of timesteps where action dimensions hit their min/max bounds, indicating hardware limits or clipping.
-
-- **Output**: `saturation_per_dim`, `overall_saturation`, `saturated_dims`
-- **Supports**: Known bounds via `--action-bounds` or auto-inferred from data
-
-### 7. Static Episode Detection
-Fraction of episode where the robot is essentially not moving, detecting idle periods.
-
-- **Output**: `static_fraction`, `is_mostly_static`, `longest_static_run`, `static_segments`
-- **Reference**: Liu et al. "SCIZOR" (2025) — 15.4% avg improvement after filtering static data
-
-### 8. Action Distribution Entropy
-Shannon entropy of action distribution per dimension, normalized to 0-1 range. Measures diversity within an episode.
-
-- **Output**: `entropy_per_dim`, `mean_entropy`
-- **Scoring**: Bell curve — penalizes both too low (repetitive) and too high (random)
-- **Reference**: Belkhale et al. "DemInf" (2025); Belkhale & Sadigh "Data Quality in Imitation Learning" (NeurIPS, 2023)
-
-### 9. Manipulability Index (Yoshikawa) — Deferred
-Distance from singular configurations. Requires a kinematic model (URDF).
-
-- **Status**: Not implemented. Needs robot-specific URDF and a kinematics library (pinocchio/ikpy).
-- **Reference**: Yoshikawa (1985); validated in Sakr et al. (2024)
-
-### 10. Composite Quality Score
-Weighted combination of metrics 1-8, normalized to a 0-10 scale.
-
-| Metric | Weight | Scoring |
+| Measurement | Meaning | Included in score? |
 |---|---|---|
-| Smoothness (LDLJ) | 0.25 | Sigmoid normalization |
-| Dead Actions | 0.15 | 1.0 - dead_fraction |
-| Gripper Health | 0.15 | 1.0 if clean, penalized by chatter rate |
-| Static Detection | 0.15 | 1.0 - static_fraction |
-| Timestamp Regularity | 0.10 | 1.0 if jitter < threshold |
-| Action Saturation | 0.10 | 1.0 - overall_saturation |
-| Action Diversity | 0.10 | Bell curve around expected entropy |
+| LDLJ smoothness | Position jerk normalized by duration and peak speed | Yes |
+| Dead-action fraction | Zero or adjacent repeated commands; holds can be intentional | Yes |
+| Gripper chatter | Rapid transitions on explicitly configured action channels | When configured |
+| Static fraction | Sustained low measured speed over valid observed time | When available |
+| Timestamp regularity | Jitter and gaps against expected FPS | When available |
+| Action saturation | Occupancy near supplied physical command limits | When configured |
+| Action entropy | Marginal action-distribution entropy | Yes |
+| Path length | Travel in selected, scaled position channels | No |
+| SPARC | Frequency-based smoothness | No |
+| PSD bands | Action energy in configured frequency bands | No; can flag high-band activity |
+| State/action consistency | Raw action variance among nearby within-episode states | No |
 
-All weights and thresholds are configurable via `QualityConfig`.
+The composite normalizes weights over available components. Default weights are
+0.25 for smoothness; 0.15 each for dead actions, gripper health, and static fraction;
+and 0.10 each for timing, saturation, and entropy. Configure them with `QualityConfig`.
+Missing components and robot-specific thresholds limit comparisons between scores.
+Path length, entropy, and consistency do not establish task progress or success.
 
-## Module Structure
+## Compatibility
 
-```
-forge/quality/
-    __init__.py       Public API exports
-    config.py         QualityConfig dataclass (all thresholds, weights, params)
-    metrics.py        Individual metric functions (pure numpy)
-    analyzer.py       QualityAnalyzer orchestrator + dataset-level analysis
-    models.py         EpisodeQuality, QualityReport, TimestampResult, StaticResult
-```
+- Gripper detection is disabled by default. Set `gripper_dim` or `gripper_dims`.
+- Without physical limits, observed action-range occupancy is descriptive only.
+- Motion requires position-state columns. Command smoothness is a fallback only
+  when states are absent and `action_semantics="position"` is explicit.
+- Invalid data retains its frame alignment and is not replaced with zeros.
+- Scores can be null. Consumers must handle unavailable results.
+- Legacy JSON remains readable. Recalibrate thresholds when moving from q-v1.
+- Video JSON keeps per-camera details and legacy flat fields. See the
+  [video compatibility notes](video/README.md#reports-and-viewer).
 
-## Adding a New Metric
+## Development
 
-To add a new quality metric, update these locations:
+`config.py` defines thresholds; `metrics.py` contains scalar measurements;
+`diagnostics.py` produces temporal events. `analyzer.py` coordinates them, and
+`models.py` handles report serialization.
 
-### 1. Add the metric function (`metrics.py`)
+For a new check, add configuration, result fields, availability, and provenance.
+Add frame/time evidence when localizable. Keep descriptive attributes outside the
+composite unless their interpretation is justified. Test valid, invalid, missing,
+and degenerate inputs, plus serialization and CLI integration where applicable.
 
-Write a pure function that takes numpy arrays and returns results. Follow the existing pattern:
-
-```python
-def my_new_metric(
-    actions: NDArray, config: QualityConfig
-) -> tuple[float, ...]:
-    """One-line description.
-
-    Args:
-        actions: Shape (T, D) action array.
-        config: Quality configuration.
-
-    Returns:
-        Tuple of result values.
-    """
-    # Implementation using vectorized numpy — no Python loops over timesteps
-    ...
-```
-
-Requirements:
-- **Numpy only** — no torch, tensorflow, or heavy dependencies
-- **Return None** if the metric can't be computed (too few frames, missing data)
-- **Handle NaN/Inf** gracefully — the analyzer sanitizes inputs, but be defensive
-- Cite the paper in the module docstring at the top of `metrics.py`
-
-### 2. Add result fields (`models.py`)
-
-Add fields to `EpisodeQuality` for storing the metric's output:
-
-```python
-# Metric N: My New Metric
-my_metric_value: float | None = None
-```
-
-If the metric returns a complex result, add a new dataclass (like `StaticResult` or `TimestampResult`) and reference it from `EpisodeQuality`. Include relevant fields in `to_dict()` for JSON export.
-
-### 3. Wire into the analyzer (`analyzer.py`)
-
-In `QualityAnalyzer.analyze_episode_arrays()`, call your metric and store the results:
-
-```python
-# N. My new metric
-eq.my_metric_value = my_new_metric(actions, self.config)
-```
-
-Place it in the appropriate section (action-based, state-based, or timestamp-based).
-
-### 4. Add scoring to composite score (`metrics.py`)
-
-In `composite_score()`, add a scoring block that maps your metric's raw value to a 0-1 quality signal:
-
-```python
-# My new metric
-if my_metric_value is not None:
-    subscores["my_metric"] = ...  # 0-1 quality signal
-    weights["my_metric"] = config.weight_my_metric
-    if my_metric_value > config.my_metric_flag:
-        flags.append("my_metric_issue")
-```
-
-### 5. Add config fields (`config.py`)
-
-Add any thresholds, weights, and parameters to `QualityConfig`:
-
-```python
-# ── My new metric ──
-my_metric_threshold: float = 0.5
-weight_my_metric: float = 0.10
-```
-
-Adjust existing weights so they still sum to 1.0 (or close to it — the composite score normalizes by total weight).
-
-### 6. Add recommendations (`analyzer.py`)
-
-In `_generate_recommendations()`, add a human-readable flag and actionable suggestion:
-
-```python
-if "my_metric_issue" in flagged:
-    n = len(flagged["my_metric_issue"])
-    flags.append(f"{n} episodes with my metric issue")
-    recs.append("Suggestion for the user")
-```
-
-### 7. Add tests (`tests/test_quality.py`)
-
-Add a test class with at least:
-- A test for the expected good case
-- A test for the expected bad case
-- Edge cases (empty data, constant values, etc.)
-
-```python
-class TestMyNewMetric:
-    def test_good_case(self):
-        ...
-
-    def test_bad_case(self):
-        ...
-```
+See [validation and benchmarks](../../docs/reports/README.md) and the
+[viewer guide](../visualize/README.md).

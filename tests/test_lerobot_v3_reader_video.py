@@ -107,3 +107,50 @@ def test_frame_offset_is_correct_within_episode(written_dataset: Path):
         assert m == pytest.approx(_expected_mean(N_EPISODES - 1, t), abs=10)
     # Strictly increasing content over time.
     assert means[0] < means[1] < means[2]
+
+
+def test_unavailable_video_raises_instead_of_synthetic_pixels(tmp_path):
+    from forge.formats.lerobot_v3.reader import VideoFrameCache
+
+    cache = VideoFrameCache(tmp_path / 'absent.mp4')
+    with pytest.raises(ValueError, match='Cannot open'):
+        cache.get_frame(0)
+
+
+def test_exhausted_video_does_not_repeat_last_frame(written_dataset):
+    from forge.formats.lerobot_v3.reader import VideoFrameCache
+
+    path = next((written_dataset / 'videos').rglob('*.mp4'))
+    cache = VideoFrameCache(path)
+    try:
+        assert cache.get_frame(0).size
+        with pytest.raises(ValueError, match='Cannot decode'):
+            cache.get_frame(100000)
+    finally:
+        cache.close()
+
+
+def test_declared_cameras_survive_missing_video_files(written_dataset):
+    import shutil
+    from forge.quality.video import VideoQualityAnalyzer
+
+    shutil.rmtree(written_dataset / 'videos')
+    ep = next(LeRobotV3Reader().read_episodes(written_dataset))
+    assert 'cam' in ep.cameras
+    video = VideoQualityAnalyzer().analyze_episode(ep)
+    assert video.per_camera['cam'].missing_frames == T
+
+
+def test_missing_requested_index_does_not_return_nearby_pixels(monkeypatch, tmp_path):
+    from types import SimpleNamespace
+    from forge.formats.lerobot_v3.reader import VideoFrameCache
+
+    cache = VideoFrameCache(tmp_path / 'fixture.mp4')
+    pixels = np.full((4, 4, 3), 91, dtype=np.uint8)
+    cache._decoder = iter([SimpleNamespace(index=2, to_ndarray=lambda **kwargs: pixels)])
+    cache._current_frame_idx = 0
+    monkeypatch.setattr(cache, '_open', lambda: True)
+    monkeypatch.setattr(cache, '_frame_index_of', lambda frame: frame.index)
+    with pytest.raises(ValueError, match='absent'):
+        cache.get_frame(1)
+    np.testing.assert_array_equal(cache.get_frame(2), pixels)

@@ -9,7 +9,24 @@ video fields directly.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field, fields
+
+
+@dataclass
+class VideoEvent:
+    """Camera-scoped observation evidence; frame end is exclusive.
+
+    Times are None when neither timestamps nor FPS support a timebase.
+    Sparse pixel events describe analyzed samples, not unseen intervening frames.
+    """
+
+    kind: str
+    camera: str
+    start_frame: int
+    end_frame: int
+    start_time_s: float | None
+    end_time_s: float | None
+    evidence: dict = field(default_factory=dict)
 
 
 @dataclass
@@ -20,6 +37,31 @@ class CameraVideoQuality:
     num_frames: int = 0
     width: int | None = None
     height: int | None = None
+
+    expected_frames: int = 0
+    present_frames: int = 0
+    missing_frames: int = 0
+    decode_attempts: int = 0
+    decode_failures: int = 0
+    invalid_frames: int = 0
+    sampled_out_frames: int = 0
+    capped_frames: int = 0
+    missing_fraction: float | None = None
+    decode_coverage: float | None = None
+    timestamp_coverage: float | None = None
+    effective_fps: float | None = None
+    timestamp_jitter_ratio: float | None = None
+    estimated_drop_fraction: float | None = None
+    timestamp_gaps: int = 0
+    estimated_dropped_frames: int | None = None
+    max_frame_gap_s: float | None = None
+    timestamp_invalid_count: int = 0
+    resolution_changes: int = 0
+    max_frozen_duration_s: float | None = None
+    mean_motion_px_s: float | None = None
+    metric_status: dict[str, str] = field(default_factory=dict)
+    provenance: dict = field(default_factory=dict)
+    events: list[VideoEvent] = field(default_factory=list)
 
     # Sharpness (variance of Laplacian)
     mean_sharpness: float | None = None
@@ -39,34 +81,23 @@ class CameraVideoQuality:
     mean_colorfulness: float | None = None
 
     # Tier 1: motion (None unless level="motion")
-    mean_motion: float | None = None          # mean flow magnitude, px/frame
-    motion_smoothness: float | None = None    # pixel-space LDLJ (more negative = jerkier)
+    mean_motion: float | None = None  # mean flow magnitude, px/frame
+    motion_smoothness: float | None = None  # pixel-space LDLJ (more negative = jerkier)
     scene_motion_fraction: float | None = None  # residual / total flow (object vs camera)
     cut_count: int | None = None
 
     flags: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
-        return {
-            "camera": self.camera,
-            "num_frames": self.num_frames,
-            "width": self.width,
-            "height": self.height,
-            "mean_sharpness": _round(self.mean_sharpness),
-            "min_sharpness": _round(self.min_sharpness),
-            "blurry_fraction": _round(self.blurry_fraction),
-            "mean_luma": _round(self.mean_luma),
-            "overexposed_fraction": _round(self.overexposed_fraction),
-            "underexposed_fraction": _round(self.underexposed_fraction),
-            "frozen_fraction": _round(self.frozen_fraction),
-            "longest_frozen_run": self.longest_frozen_run,
-            "mean_colorfulness": _round(self.mean_colorfulness),
-            "mean_motion": _round(self.mean_motion),
-            "motion_smoothness": _round(self.motion_smoothness),
-            "scene_motion_fraction": _round(self.scene_motion_fraction),
-            "cut_count": self.cut_count,
-            "flags": self.flags,
-        }
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict) -> CameraVideoQuality:
+        cam = cls(
+            **{f.name: data[f.name] for f in fields(cls) if f.name in data and f.name != "events"}
+        )
+        cam.events = [VideoEvent(**e) for e in data.get("events", [])]
+        return cam
 
 
 @dataclass
@@ -74,6 +105,8 @@ class VideoQuality:
     """Episode-level video quality, with per-camera detail and rollups."""
 
     per_camera: dict[str, CameraVideoQuality] = field(default_factory=dict)
+    scorer_version: str = "video-v2-integrity"
+    provenance: dict = field(default_factory=dict)
 
     # Episode rollups (worst-case across cameras, for one-line filtering)
     min_sharpness: float | None = None
@@ -114,7 +147,22 @@ class VideoQuality:
     def to_dict(self) -> dict:
         d = self.to_flat_dict()
         d["per_camera"] = {n: c.to_dict() for n, c in self.per_camera.items()}
+        d["scorer_version"] = self.scorer_version
+        d["provenance"] = self.provenance
+        d["flags"] = self.flags
         return d
+
+    @classmethod
+    def from_dict(cls, data: dict) -> VideoQuality:
+        video = cls.from_flat_dict(data) or cls()
+        video.per_camera = {
+            name: CameraVideoQuality.from_dict(cam)
+            for name, cam in data.get("per_camera", {}).items()
+        }
+        video.scorer_version = data.get("scorer_version", "video-v1")
+        video.provenance = data.get("provenance", {})
+        video.flags = data.get("flags", [])
+        return video
 
     @classmethod
     def from_flat_dict(cls, data: dict) -> VideoQuality | None:
@@ -126,6 +174,7 @@ class VideoQuality:
         if "video_min_sharpness" not in data and "video_num_cameras" not in data:
             return None
         return cls(
+            scorer_version="video-v1",
             min_sharpness=data.get("video_min_sharpness"),
             mean_sharpness=data.get("video_mean_sharpness"),
             blurry_fraction=data.get("video_blurry_fraction"),

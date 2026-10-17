@@ -23,10 +23,9 @@ from forge.core.exceptions import ForgeError
 # `dedup_edges` and `curation_labels`.
 SCHEMA_VERSION = 3
 
-# Version tag stamped on every quality_scores row. The quality module has no
-# version of its own today, so the catalog owns this constant. Bump it when the
-# scoring math changes so old scores remain distinguishable and reproducible.
-SCORER_VERSION = "q-v1"
+# Version tag stamped on every quality_scores row. Keep this aligned with
+# EpisodeQuality.scorer_version when scoring semantics change.
+SCORER_VERSION = "q-v2-proprio"
 
 # Names of the per-episode quality metrics, mirrored EXACTLY from the flat dict
 # produced by forge.quality.models.EpisodeQuality.to_dict(). Kept as a list so
