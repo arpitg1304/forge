@@ -537,7 +537,10 @@ class LeRobotV3Writer:
         meta_dir = output_path / "meta"
         meta_dir.mkdir(parents=True, exist_ok=True)
 
-        fps = int(self.config.fps or dataset_info.inferred_fps or 30)
+        fps = float(self.config.fps or dataset_info.inferred_fps or 30)
+        # Keep fractional rates (29.97, 12.5 Hz); write whole rates as ints like LeRobot does.
+        if fps.is_integer():
+            fps = int(fps)
         # Use metadata count if available, otherwise fall back to dataset_info
         # (needed for parallel processing where workers write directly)
         total_episodes = len(self._episode_metadata) if self._episode_metadata else dataset_info.num_episodes

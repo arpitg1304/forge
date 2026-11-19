@@ -411,7 +411,7 @@ def _generate_recommendations(
         n = len(flagged["gripper_chatter"])
         flags.append(f"{n} episodes with gripper chatter (rate > {config.chatter_threshold}/sec)")
         recs.append(
-            f"Review gripper threshold or filter: forge filter --max-gripper-chatter {config.chatter_threshold}"
+            "Review the gripper threshold, or filter: forge filter --exclude-flags gripper_chatter"
         )
 
     if "mostly_static" in flagged:

@@ -301,7 +301,9 @@ class FilterEngine:
         # Min quality score
         if self.config.min_quality is not None and eq is not None:
             score = eq.overall_score
-            if score is not None and score < self.config.min_quality:
+            if score is None:
+                reasons.append(f"no quality score (min {self.config.min_quality} required)")
+            elif score < self.config.min_quality:
                 reasons.append(f"score {score:.1f} < min {self.config.min_quality}")
 
         # Exclude flags

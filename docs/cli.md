@@ -99,8 +99,10 @@ forge visualize /path/to/dataset --backend opencv
 ```
 
 **Backends:**
-- `matplotlib` (default) - Interactive with sliders, slower playback
+- `web` (default) - Browser viewer, no extra install
+- `matplotlib` - Interactive with sliders, slower playback
 - `opencv` - Fast video playback, keyboard controls
+- `rerun` - Cameras and time series on one timeline (`pip install "forge-robotics[rerun]"`)
 
 **Matplotlib controls:**
 - Episode slider: Navigate between episodes
@@ -132,13 +134,13 @@ forge quality /path/to/dataset --gripper-dim 6 --fps 30
 forge quality /path/to/dataset --export report.json
 forge quality /path/to/dataset --export-flagged flagged.json
 
-# Quick mode (skip expensive metrics)
+# Quick mode (scores the first 50 episodes)
 forge quality /path/to/dataset --quick
 
 # Known action bounds (tighter saturation detection)
 forge quality /path/to/dataset --action-bounds -1.0,1.0
 
-# Sample subset
+# Score only the first 50 episodes (not a random sample)
 forge quality /path/to/dataset --sample 50
 ```
 
@@ -226,7 +228,7 @@ forge segment /path/to/dataset --penalty aic --min-segment-length 15
 - `--cost-model`: Cost function for segment homogeneity (`rbf`, `l2`, `l1`, `normal`, `ar`)
 - `--min-segment-length`: Minimum segment length in frames (default: 10)
 - `--normalize / --no-normalize`: Z-score normalize per dimension (default: enabled)
-- `--sample`: Analyze a random subset of episodes
+- `--sample`: Analyze the first N episodes (not a random sample)
 - `--export`: Save JSON report with per-episode segmentation results
 - `--plot`: Generate a timeline PNG visualization
 - `--format`: Format hint for dataset loading
@@ -324,7 +326,7 @@ forge hub --author berkeley-humanoid
 forge hub --download lerobot/pusht
 ```
 
-Downloaded datasets are cached in `~/.cache/forge/datasets/`.
+Downloads use the standard Hugging Face Hub cache (`~/.cache/huggingface/hub/`, honouring `HF_HOME` / `HF_HUB_CACHE`), so they are shared with other HF tools. Set `FORGE_CACHE_DIR` to use `$FORGE_CACHE_DIR/datasets/` instead.
 
 ---
 
@@ -354,7 +356,7 @@ forge version
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `FORGE_CACHE_DIR` | Dataset cache location | `~/.cache/forge` |
+| `FORGE_CACHE_DIR` | Override the dataset cache (`$FORGE_CACHE_DIR/datasets`) | unset: Hugging Face Hub cache |
 | `FORGE_LOG_LEVEL` | Logging verbosity | `INFO` |
 
 ---
@@ -367,11 +369,11 @@ forge version
 # Download from HuggingFace
 forge hub --download openvla/droid_100
 
-# Inspect to understand structure
-forge inspect ~/.cache/forge/datasets/openvla/droid_100
+# Inspect to understand structure (hf:// paths resolve to the local cache)
+forge inspect hf://openvla/droid_100
 
 # Convert to LeRobot v3
-forge convert ~/.cache/forge/datasets/openvla/droid_100 \
+forge convert hf://openvla/droid_100 \
     ./droid_lerobot \
     --format lerobot-v3 \
     --workers 4

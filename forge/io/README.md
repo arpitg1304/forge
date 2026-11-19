@@ -51,7 +51,7 @@ Any command that takes a dataset path works with a cloud URI:
 ```bash
 forge inspect s3://my-bucket/datasets/run_0413
 forge convert gs://lab-data/rosbags ./out --format lerobot-v3
-forge quality s3://my-bucket/datasets/droid --report report.html
+forge quality s3://my-bucket/datasets/droid --export report.json
 forge stats  gs://lab-data/pusht.zarr
 ```
 
