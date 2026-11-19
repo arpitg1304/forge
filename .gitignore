@@ -91,6 +91,7 @@ PROJECT_PLAN.md
 RESEARCH_DIRECTIONS.md
 INTRO_DRAFTS.md
 CONVERSION_TESTS.md
+SYNC_QA_PLAN.md
 
 # Converted dataset outputs
 stack_lego_rlds/
@@ -98,3 +99,7 @@ stack_lego_rlds/
 # HuggingFace cache (user-specific)
 # ~/.cache/forge/ is outside repo, but just in case
 .cache/
+
+# Local archive of retired plans and drafts (kept out of the repo)
+.archive/
+FORGE_GAPS.md
