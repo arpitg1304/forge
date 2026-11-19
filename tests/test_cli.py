@@ -33,7 +33,7 @@ class TestCLI:
         """Test the version command."""
         result = runner.invoke(app, ["version"])
         assert result.exit_code == 0
-        assert "0.1.0" in result.stdout
+        assert "0.2.0" in result.stdout
 
     def test_formats_command(self):
         """Test the formats command."""

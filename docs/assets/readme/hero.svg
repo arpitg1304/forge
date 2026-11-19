@@ -1,0 +1,111 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 500" width="1200" height="500" font-family="'JetBrains Mono','SF Mono',Menlo,Consolas,monospace">
+<defs>
+<clipPath id="card"><rect width="1200" height="500" rx="16"/></clipPath>
+<pattern id="gMin" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M20 0H0V20" fill="none" stroke="#101722" stroke-width="1"/></pattern>
+<pattern id="gMaj" width="100" height="100" patternUnits="userSpaceOnUse"><rect width="100" height="100" fill="url(#gMin)"/><path d="M100 0H0V100" fill="none" stroke="#151e2b" stroke-width="1"/></pattern>
+<radialGradient id="vig" cx="50%" cy="50%" r="75%"><stop offset="55%" stop-color="#05070a" stop-opacity="0"/><stop offset="100%" stop-color="#05070a" stop-opacity="0.6"/></radialGradient>
+<filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="6"/></filter>
+</defs>
+<style>
+text{font-family:'JetBrains Mono','SF Mono',Menlo,Consolas,monospace}
+.glow{animation:pulse 3.2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:.35}50%{opacity:.75}}
+.rd rect{animation:lit 8s infinite}.wr rect{animation:litg 8s infinite}
+@keyframes lit{0%,100%{stroke:#2a3647}6%,16%{stroke:#4cc9f0}24%{stroke:#2a3647}}
+@keyframes litg{0%,100%{stroke:#2a3647}6%,16%{stroke:#34d399}24%{stroke:#2a3647}}
+.op rect{animation:op 9s infinite}.op text{animation:opt 9s infinite}
+@keyframes op{0%,100%{stroke:#2a3647}4%,14%{stroke:#7aa2ff}20%{stroke:#2a3647}}
+@keyframes opt{0%,100%{fill:#6b7a90}4%,14%{fill:#d6dee8}20%{fill:#6b7a90}}
+.ph{animation:ph 5s steps(5) infinite}
+@keyframes ph{from{transform:translateX(0)}to{transform:translateX(200px)}}
+@media (prefers-reduced-motion: reduce){*{animation:none!important}}
+</style>
+<g clip-path="url(#card)">
+<rect width="1200" height="500" fill="#0a0e14"/>
+<rect width="1200" height="500" fill="url(#gMaj)"/>
+<rect width="1200" height="500" fill="url(#vig)"/>
+<circle cx="31" cy="32" r="3" fill="#7aa2ff"/>
+<text x="40" y="36" font-size="13" fill="#6b7a90">forge://hub</text>
+<text x="1172" y="478" font-size="13" fill="#6b7a90" text-anchor="end">add a reader, get every writer · O(n), not O(n²)</text>
+<text x="48" y="84" font-size="13" fill="#6b7a90">read</text>
+<text x="1152" y="84" font-size="13" fill="#6b7a90" text-anchor="end">write</text>
+<path id="r0" d="M198 111.0 C334.0 111.0 334.0 162 470 162" fill="none" stroke="#2a3647" stroke-width="1.5" stroke-dasharray="4 6" stroke-linecap="round"/>
+<path id="r1" d="M198 151.0 C334.0 151.0 334.0 174 470 174" fill="none" stroke="#2a3647" stroke-width="1.5" stroke-dasharray="4 6" stroke-linecap="round"/>
+<path id="r2" d="M198 191.0 C334.0 191.0 334.0 186 470 186" fill="none" stroke="#2a3647" stroke-width="1.5" stroke-dasharray="4 6" stroke-linecap="round"/>
+<path id="r3" d="M198 231.0 C334.0 231.0 334.0 198 470 198" fill="none" stroke="#2a3647" stroke-width="1.5" stroke-dasharray="4 6" stroke-linecap="round"/>
+<path id="r4" d="M198 271.0 C334.0 271.0 334.0 210 470 210" fill="none" stroke="#2a3647" stroke-width="1.5" stroke-dasharray="4 6" stroke-linecap="round"/>
+<path id="r5" d="M198 311.0 C334.0 311.0 334.0 222 470 222" fill="none" stroke="#2a3647" stroke-width="1.5" stroke-dasharray="4 6" stroke-linecap="round"/>
+<path id="r6" d="M198 351.0 C334.0 351.0 334.0 234 470 234" fill="none" stroke="#2a3647" stroke-width="1.5" stroke-dasharray="4 6" stroke-linecap="round"/>
+<path id="r7" d="M198 391.0 C334.0 391.0 334.0 246 470 246" fill="none" stroke="#2a3647" stroke-width="1.5" stroke-dasharray="4 6" stroke-linecap="round"/>
+<path id="w0" d="M730 180 C866.0 180 866.0 141.0 1002 141.0" fill="none" stroke="#2a3647" stroke-width="1.5" stroke-dasharray="4 6" stroke-linecap="round"/>
+<path id="w1" d="M730 196 C866.0 196 866.0 191.0 1002 191.0" fill="none" stroke="#2a3647" stroke-width="1.5" stroke-dasharray="4 6" stroke-linecap="round"/>
+<path id="w2" d="M730 212 C866.0 212 866.0 241.0 1002 241.0" fill="none" stroke="#2a3647" stroke-width="1.5" stroke-dasharray="4 6" stroke-linecap="round"/>
+<path id="w3" d="M730 228 C866.0 228 866.0 291.0 1002 291.0" fill="none" stroke="#2a3647" stroke-width="1.5" stroke-dasharray="4 6" stroke-linecap="round"/>
+<g class="rd"><rect style="animation-delay:0.0s" x="48" y="96" width="150" height="30" rx="8" fill="#0f1520" stroke="#2a3647" stroke-width="1.5"/><text x="123.0" y="115.9" font-size="14" fill="#d6dee8" text-anchor="middle">RLDS</text></g>
+<g class="rd"><rect style="animation-delay:0.9s" x="48" y="136" width="150" height="30" rx="8" fill="#0f1520" stroke="#2a3647" stroke-width="1.5"/><text x="123.0" y="155.9" font-size="14" fill="#d6dee8" text-anchor="middle">LeRobot v2/v3</text></g>
+<g class="rd"><rect style="animation-delay:1.8s" x="48" y="176" width="150" height="30" rx="8" fill="#0f1520" stroke="#2a3647" stroke-width="1.5"/><text x="123.0" y="195.9" font-size="14" fill="#d6dee8" text-anchor="middle">GR00T</text></g>
+<g class="rd"><rect style="animation-delay:2.7s" x="48" y="216" width="150" height="30" rx="8" fill="#0f1520" stroke="#2a3647" stroke-width="1.5"/><text x="123.0" y="235.9" font-size="14" fill="#d6dee8" text-anchor="middle">HDF5</text></g>
+<g class="rd"><rect style="animation-delay:3.6s" x="48" y="256" width="150" height="30" rx="8" fill="#0f1520" stroke="#2a3647" stroke-width="1.5"/><text x="123.0" y="275.9" font-size="14" fill="#d6dee8" text-anchor="middle">Zarr</text></g>
+<g class="rd"><rect style="animation-delay:4.5s" x="48" y="296" width="150" height="30" rx="8" fill="#0f1520" stroke="#2a3647" stroke-width="1.5"/><text x="123.0" y="315.9" font-size="14" fill="#d6dee8" text-anchor="middle">MCAP</text></g>
+<g class="rd"><rect style="animation-delay:5.4s" x="48" y="336" width="150" height="30" rx="8" fill="#0f1520" stroke="#2a3647" stroke-width="1.5"/><text x="123.0" y="355.9" font-size="14" fill="#d6dee8" text-anchor="middle">rosbag</text></g>
+<g class="rd"><rect style="animation-delay:6.3s" x="48" y="376" width="150" height="30" rx="8" fill="#0f1520" stroke="#2a3647" stroke-width="1.5"/><text x="123.0" y="395.9" font-size="14" fill="#d6dee8" text-anchor="middle">RoboDM</text></g>
+<g class="wr"><rect style="animation-delay:0.6s" x="1002" y="126" width="150" height="30" rx="8" fill="#0f1520" stroke="#2a3647" stroke-width="1.5"/><text x="1077.0" y="145.9" font-size="14" fill="#d6dee8" text-anchor="middle">LeRobot v3</text></g>
+<g class="wr"><rect style="animation-delay:2.5s" x="1002" y="176" width="150" height="30" rx="8" fill="#0f1520" stroke="#2a3647" stroke-width="1.5"/><text x="1077.0" y="195.9" font-size="14" fill="#d6dee8" text-anchor="middle">RLDS</text></g>
+<g class="wr"><rect style="animation-delay:4.4s" x="1002" y="226" width="150" height="30" rx="8" fill="#0f1520" stroke="#2a3647" stroke-width="1.5"/><text x="1077.0" y="245.9" font-size="14" fill="#d6dee8" text-anchor="middle">MCAP</text></g>
+<g class="wr"><rect style="animation-delay:6.3s" x="1002" y="276" width="150" height="30" rx="8" fill="#0f1520" stroke="#2a3647" stroke-width="1.5"/><text x="1077.0" y="295.9" font-size="14" fill="#d6dee8" text-anchor="middle">RoboDM</text></g>
+<circle r="3.5" fill="#4cc9f0" opacity="0"><animateMotion dur="2.6s" begin="0.00s" repeatCount="indefinite"><mpath href="#r0"/></animateMotion><animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.12;.85;1" dur="2.6s" begin="0.00s" repeatCount="indefinite"/></circle>
+<circle r="3.5" fill="#4cc9f0" opacity="0"><animateMotion dur="2.6s" begin="1.70s" repeatCount="indefinite"><mpath href="#r1"/></animateMotion><animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.12;.85;1" dur="2.6s" begin="1.70s" repeatCount="indefinite"/></circle>
+<circle r="3.5" fill="#4cc9f0" opacity="0"><animateMotion dur="2.6s" begin="0.80s" repeatCount="indefinite"><mpath href="#r2"/></animateMotion><animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.12;.85;1" dur="2.6s" begin="0.80s" repeatCount="indefinite"/></circle>
+<circle r="3.5" fill="#4cc9f0" opacity="0"><animateMotion dur="2.6s" begin="2.50s" repeatCount="indefinite"><mpath href="#r3"/></animateMotion><animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.12;.85;1" dur="2.6s" begin="2.50s" repeatCount="indefinite"/></circle>
+<circle r="3.5" fill="#4cc9f0" opacity="0"><animateMotion dur="2.6s" begin="1.60s" repeatCount="indefinite"><mpath href="#r4"/></animateMotion><animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.12;.85;1" dur="2.6s" begin="1.60s" repeatCount="indefinite"/></circle>
+<circle r="3.5" fill="#4cc9f0" opacity="0"><animateMotion dur="2.6s" begin="0.70s" repeatCount="indefinite"><mpath href="#r5"/></animateMotion><animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.12;.85;1" dur="2.6s" begin="0.70s" repeatCount="indefinite"/></circle>
+<circle r="3.5" fill="#4cc9f0" opacity="0"><animateMotion dur="2.6s" begin="2.40s" repeatCount="indefinite"><mpath href="#r6"/></animateMotion><animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.12;.85;1" dur="2.6s" begin="2.40s" repeatCount="indefinite"/></circle>
+<circle r="3.5" fill="#4cc9f0" opacity="0"><animateMotion dur="2.6s" begin="1.50s" repeatCount="indefinite"><mpath href="#r7"/></animateMotion><animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.12;.85;1" dur="2.6s" begin="1.50s" repeatCount="indefinite"/></circle>
+<circle r="3.5" fill="#34d399" opacity="0"><animateMotion dur="2.6s" begin="2.10s" repeatCount="indefinite"><mpath href="#w0"/></animateMotion><animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.12;.85;1" dur="2.6s" begin="2.10s" repeatCount="indefinite"/></circle>
+<circle r="3.5" fill="#34d399" opacity="0"><animateMotion dur="2.6s" begin="0.80s" repeatCount="indefinite"><mpath href="#w1"/></animateMotion><animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.12;.85;1" dur="2.6s" begin="0.80s" repeatCount="indefinite"/></circle>
+<circle r="3.5" fill="#34d399" opacity="0"><animateMotion dur="2.6s" begin="2.10s" repeatCount="indefinite"><mpath href="#w2"/></animateMotion><animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.12;.85;1" dur="2.6s" begin="2.10s" repeatCount="indefinite"/></circle>
+<circle r="3.5" fill="#34d399" opacity="0"><animateMotion dur="2.6s" begin="0.80s" repeatCount="indefinite"><mpath href="#w3"/></animateMotion><animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.12;.85;1" dur="2.6s" begin="0.80s" repeatCount="indefinite"/></circle>
+<rect class="glow" x="470" y="128" width="260" height="150" rx="14" fill="none" stroke="#7aa2ff" stroke-width="6" filter="url(#glow)"/>
+<rect x="470" y="128" width="260" height="150" rx="14" fill="#0f1520" stroke="#7aa2ff" stroke-width="1.8"/>
+<text x="600.0" y="158" font-size="18" fill="#d6dee8" text-anchor="middle" font-weight="600">Episode / Frame</text>
+<rect x="492" y="174" width="216" height="42" rx="3" fill="#070a0f" stroke="#2a3647"/>
+<rect x="496" y="177" width="7" height="3" rx="1" fill="#2a3647"/><rect x="496" y="210" width="7" height="3" rx="1" fill="#2a3647"/>
+<rect x="514" y="177" width="7" height="3" rx="1" fill="#2a3647"/><rect x="514" y="210" width="7" height="3" rx="1" fill="#2a3647"/>
+<rect x="532" y="177" width="7" height="3" rx="1" fill="#2a3647"/><rect x="532" y="210" width="7" height="3" rx="1" fill="#2a3647"/>
+<rect x="550" y="177" width="7" height="3" rx="1" fill="#2a3647"/><rect x="550" y="210" width="7" height="3" rx="1" fill="#2a3647"/>
+<rect x="568" y="177" width="7" height="3" rx="1" fill="#2a3647"/><rect x="568" y="210" width="7" height="3" rx="1" fill="#2a3647"/>
+<rect x="586" y="177" width="7" height="3" rx="1" fill="#2a3647"/><rect x="586" y="210" width="7" height="3" rx="1" fill="#2a3647"/>
+<rect x="604" y="177" width="7" height="3" rx="1" fill="#2a3647"/><rect x="604" y="210" width="7" height="3" rx="1" fill="#2a3647"/>
+<rect x="622" y="177" width="7" height="3" rx="1" fill="#2a3647"/><rect x="622" y="210" width="7" height="3" rx="1" fill="#2a3647"/>
+<rect x="640" y="177" width="7" height="3" rx="1" fill="#2a3647"/><rect x="640" y="210" width="7" height="3" rx="1" fill="#2a3647"/>
+<rect x="658" y="177" width="7" height="3" rx="1" fill="#2a3647"/><rect x="658" y="210" width="7" height="3" rx="1" fill="#2a3647"/>
+<rect x="676" y="177" width="7" height="3" rx="1" fill="#2a3647"/><rect x="676" y="210" width="7" height="3" rx="1" fill="#2a3647"/>
+<rect x="694" y="177" width="7" height="3" rx="1" fill="#2a3647"/><rect x="694" y="210" width="7" height="3" rx="1" fill="#2a3647"/>
+<rect x="496" y="183" width="32" height="24" rx="2" fill="#16202e"/><line x1="498" y1="202" x2="526" y2="202" stroke="#2a3647"/><path d="M512 183 V187 M508 187 h8 M508 187 v3 M516 187 v3" stroke="#6b7a90" stroke-width="1.2" fill="none"/><rect x="509.5" y="198" width="5" height="3" rx="1" fill="#7aa2ff"/>
+<rect x="532" y="183" width="32" height="24" rx="2" fill="#16202e"/><line x1="534" y1="202" x2="562" y2="202" stroke="#2a3647"/><path d="M548 183 V191 M544 191 h8 M544 191 v3 M552 191 v3" stroke="#6b7a90" stroke-width="1.2" fill="none"/><rect x="545.5" y="198" width="5" height="3" rx="1" fill="#7aa2ff"/>
+<rect x="568" y="183" width="32" height="24" rx="2" fill="#16202e"/><line x1="570" y1="202" x2="598" y2="202" stroke="#2a3647"/><path d="M584 183 V193 M580 193 h8 M580 193 v3 M588 193 v3" stroke="#6b7a90" stroke-width="1.2" fill="none"/><rect x="581.5" y="198" width="5" height="3" rx="1" fill="#7aa2ff"/>
+<rect x="604" y="183" width="32" height="24" rx="2" fill="#16202e"/><line x1="606" y1="202" x2="634" y2="202" stroke="#2a3647"/><path d="M620 183 V191 M616 191 h8 M616 191 v3 M624 191 v3" stroke="#6b7a90" stroke-width="1.2" fill="none"/><rect x="617.5" y="195" width="5" height="3" rx="1" fill="#7aa2ff"/>
+<rect x="640" y="183" width="32" height="24" rx="2" fill="#16202e"/><line x1="642" y1="202" x2="670" y2="202" stroke="#2a3647"/><path d="M656 183 V187 M652 187 h8 M652 187 v3 M660 187 v3" stroke="#6b7a90" stroke-width="1.2" fill="none"/><rect x="653.5" y="192" width="5" height="3" rx="1" fill="#7aa2ff"/>
+<rect x="676" y="183" width="32" height="24" rx="2" fill="#16202e"/><line x1="678" y1="202" x2="706" y2="202" stroke="#2a3647"/><path d="M692 183 V189 M688 189 h8 M688 189 v3 M696 189 v3" stroke="#6b7a90" stroke-width="1.2" fill="none"/><rect x="689.5" y="198" width="5" height="3" rx="1" fill="#7aa2ff"/>
+<rect class="ph" x="495" y="182" width="34" height="26" rx="2" fill="none" stroke="#7aa2ff" stroke-width="1.5"/>
+<path id="spk" d="M492 252 L512 248 L532 256 L552 240 L572 244 L592 234 L612 250 L632 246 L652 256 L672 242 L692 246 L708 244" fill="none" stroke="#4cc9f0" stroke-width="1.6" stroke-linejoin="round" opacity=".85"/>
+<circle r="3" fill="#d6dee8"><animateMotion dur="5s" repeatCount="indefinite"><mpath href="#spk"/></animateMotion></circle>
+<path d="M600.0 278 V402" stroke="#2a3647" stroke-width="1.5" stroke-dasharray="4 6"/>
+<path d="M258.0 402 H942.0" stroke="#2a3647" stroke-width="1.5" stroke-dasharray="4 6"/>
+<path d="M258.0 402 V420" stroke="#2a3647" stroke-width="1.5"/>
+<g class="op"><rect style="animation-delay:0.0s" x="206.0" y="420" width="104" height="30" rx="15" fill="#0f1520" stroke="#2a3647" stroke-width="1.5"/><text style="animation-delay:0.0s" x="258.0" y="439.5" font-size="13" fill="#6b7a90" text-anchor="middle">inspect</text></g>
+<path d="M372.0 402 V420" stroke="#2a3647" stroke-width="1.5"/>
+<g class="op"><rect style="animation-delay:1.2s" x="320.0" y="420" width="104" height="30" rx="15" fill="#0f1520" stroke="#2a3647" stroke-width="1.5"/><text style="animation-delay:1.2s" x="372.0" y="439.5" font-size="13" fill="#6b7a90" text-anchor="middle">quality</text></g>
+<path d="M486.0 402 V420" stroke="#2a3647" stroke-width="1.5"/>
+<g class="op"><rect style="animation-delay:2.4s" x="434.0" y="420" width="104" height="30" rx="15" fill="#0f1520" stroke="#2a3647" stroke-width="1.5"/><text style="animation-delay:2.4s" x="486.0" y="439.5" font-size="13" fill="#6b7a90" text-anchor="middle">lint</text></g>
+<path d="M600.0 402 V420" stroke="#2a3647" stroke-width="1.5"/>
+<g class="op"><rect style="animation-delay:3.6s" x="548.0" y="420" width="104" height="30" rx="15" fill="#0f1520" stroke="#2a3647" stroke-width="1.5"/><text style="animation-delay:3.6s" x="600.0" y="439.5" font-size="13" fill="#6b7a90" text-anchor="middle">filter</text></g>
+<path d="M714.0 402 V420" stroke="#2a3647" stroke-width="1.5"/>
+<g class="op"><rect style="animation-delay:4.8s" x="662.0" y="420" width="104" height="30" rx="15" fill="#0f1520" stroke="#2a3647" stroke-width="1.5"/><text style="animation-delay:4.8s" x="714.0" y="439.5" font-size="13" fill="#6b7a90" text-anchor="middle">segment</text></g>
+<path d="M828.0 402 V420" stroke="#2a3647" stroke-width="1.5"/>
+<g class="op"><rect style="animation-delay:6.0s" x="776.0" y="420" width="104" height="30" rx="15" fill="#0f1520" stroke="#2a3647" stroke-width="1.5"/><text style="animation-delay:6.0s" x="828.0" y="439.5" font-size="13" fill="#6b7a90" text-anchor="middle">tokenize</text></g>
+<path d="M942.0 402 V420" stroke="#2a3647" stroke-width="1.5"/>
+<g class="op"><rect style="animation-delay:7.2s" x="890.0" y="420" width="104" height="30" rx="15" fill="#0f1520" stroke="#2a3647" stroke-width="1.5"/><text style="animation-delay:7.2s" x="942.0" y="439.5" font-size="13" fill="#6b7a90" text-anchor="middle">visualize</text></g>
+<text x="600.0" y="84" font-size="13" fill="#6b7a90" text-anchor="middle">local · hf:// · s3:// · gs://</text>
+</g>
+</svg>

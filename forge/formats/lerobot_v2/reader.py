@@ -26,6 +26,7 @@ Structure:
 from __future__ import annotations
 
 import json
+import logging
 from collections.abc import Iterator
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -48,6 +49,8 @@ from forge.formats.registry import FormatRegistry
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
+
+logger = logging.getLogger(__name__)
 
 
 def _check_pyarrow() -> None:
@@ -475,12 +478,26 @@ class LeRobotV2Reader:
                     if current_frame >= frame_index:
                         return frame.to_ndarray(format="rgb24")
 
-            # If we didn't find the frame, return black
+            # Frame index past the end of the video. Fill with black, but say so:
+            # a silent black frame looks like valid data downstream.
+            logger.warning(
+                "Frame %d not found in %s; substituting a black frame", frame_index, video_path
+            )
             return np.zeros((480, 640, 3), dtype=np.uint8)
 
-        except (ImportError, Exception):
+        except ImportError as e:
+            raise MissingDependencyError(
+                "av", "decoding LeRobot v2 video frames", "pip install \"forge-robotics[video]\""
+            ) from e
+        except Exception as e:
             import numpy as np
 
+            logger.warning(
+                "Could not decode frame %d of %s (%s); substituting a black frame",
+                frame_index,
+                video_path,
+                e,
+            )
             return np.zeros((480, 640, 3), dtype=np.uint8)
 
     def read_episode(self, path: Path, episode_id: str) -> Episode:

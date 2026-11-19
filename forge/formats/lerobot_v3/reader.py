@@ -258,10 +258,13 @@ class LeRobotV3Reader:
                         major = int(version.split(".")[0])
                         if major >= 3:
                             return True
+                        # v2.x datasets can also contain tasks.jsonl, so an explicit
+                        # older version wins over the file-based checks below.
+                        return False
                     except (ValueError, IndexError):
                         pass
-                elif isinstance(version, (int, float)) and version >= 3:
-                    return True
+                elif isinstance(version, (int, float)):
+                    return version >= 3
 
             except (json.JSONDecodeError, KeyError):
                 pass
