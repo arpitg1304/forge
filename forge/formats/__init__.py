@@ -56,6 +56,12 @@ def _register_formats() -> None:
     except ImportError:
         pass
 
+    try:
+        from forge.formats import tlabel  # noqa: F401
+    except ImportError:
+        pass  # TLabel dependencies not installed
+
 
 # Register formats on module import
 _register_formats()
+
