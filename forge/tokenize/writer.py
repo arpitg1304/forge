@@ -55,6 +55,7 @@ def tokenize_and_write(
     reader=None,
     fps: float = 30.0,
     robot_type: str = "unknown",
+    task: str | None = None,
     progress_callback: Callable[[int, str], None] | None = None,
 ) -> TokenizeWriteResult:
     """Emit a LeRobot v3 dataset with an ``action_tokens`` column.
@@ -70,6 +71,8 @@ def tokenize_and_write(
         reader: Optional reader override (must expose ``read_episodes(path)``).
         fps: Frames per second for the output dataset.
         robot_type: Robot type identifier for the output dataset.
+        task: Task string for episodes without a language instruction
+            (LeRobot v3 needs one per episode).
         progress_callback: Optional ``callback(episode_idx, episode_id)``.
 
     Returns:
@@ -98,8 +101,10 @@ def tokenize_and_write(
             fps=fps,
             robot_type=robot_type,
             tokenized_action_feature=TOKEN_FEATURE,
+            task=task,
         )
     )
+    writer.begin(output)
 
     result = TokenizeWriteResult(
         output_path=output,
@@ -174,6 +179,8 @@ def _tokenize_episode(
         robot_type=episode.robot_type,
         cameras=episode.cameras,
         fps=episode.fps,
+        state_names=episode.state_names,
+        action_names=episode.action_names,
         _frame_loader=loader,
     )
 

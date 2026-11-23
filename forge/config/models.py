@@ -309,6 +309,9 @@ class ConversionConfig:
         if self.num_workers > 1:
             result["num_workers"] = self.num_workers
 
+        if self.writer_config:
+            result["writer_config"] = dict(self.writer_config)
+
         return result
 
     def to_yaml(self, path: Path | str) -> None:

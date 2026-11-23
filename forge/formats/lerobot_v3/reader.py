@@ -45,6 +45,7 @@ from forge.core.models import (
     Frame,
     LazyImage,
 )
+from forge.formats.lerobot_v3.names import episode_names
 from forge.formats.registry import FormatRegistry
 
 if TYPE_CHECKING:
@@ -872,7 +873,9 @@ class LeRobotV3Reader:
                 language = self._episode_language(
                     episode_meta.get(episode_idx) if episode_meta else None, tasks
                 )
-                yield self._proprio_episode(ep_df, episode_idx, fps, language, np)
+                yield self._proprio_episode(
+                    ep_df, episode_idx, fps, language, np, names=episode_names(info.get("features", {}))
+                )
 
     @staticmethod
     def __parquet_names(src, pq_file) -> list[str]:
@@ -881,7 +884,7 @@ class LeRobotV3Reader:
         except Exception:
             return list(LeRobotV3Reader._PROPRIO_COLUMNS)
 
-    def _proprio_episode(self, ep_df, episode_idx, fps, language, np) -> Episode:
+    def _proprio_episode(self, ep_df, episode_idx, fps, language, np, names=None) -> Episode:
         """Build a proprio-only Episode (no images) from parquet columns."""
 
         def _stack(col):
@@ -914,6 +917,7 @@ class LeRobotV3Reader:
             episode_id=f"episode_{episode_idx:06d}",
             language_instruction=language,
             fps=fps,
+            **(names or {}),
             metadata={"num_frames": n},
             _frame_loader=loader,
         )
@@ -1140,10 +1144,12 @@ class LeRobotV3Reader:
         info_path = dataset_path / "meta" / "info.json"
         camera_features: dict[str, dict] = {}
         dataset_fps = None
+        names: dict[str, list[str] | None] = {}
         if info_path.exists():
             with open(info_path) as f:
                 info = json.load(f)
                 dataset_fps = info.get("fps")
+                names = episode_names(info.get("features", {}))
                 for key, spec in info.get("features", {}).items():
                     if spec.get("dtype") == "video":
                         camera_features[key] = spec
@@ -1379,6 +1385,7 @@ class LeRobotV3Reader:
             episode_id=episode_id,
             language_instruction=language,
             fps=dataset_fps,
+            **names,
             cameras={
                 key.split(".")[-1]: CameraInfo(
                     name=key.split(".")[-1],

@@ -309,7 +309,7 @@ Forge is honest about what it does not do yet. These are tracked and being fixed
 
 - **Rosbag** conversion reads image topics only and yields the whole bag as one episode; state and action are not filled yet, even though `inspect` lists those topics.
 - **YAML conversion configs** apply `writer_config:` and `cameras:` only. `fields:`, `video:`, `include_depth` and `transform` are parsed but not applied yet.
-- **LeRobot v3 writer** writes `names: null` for features, uses the task `"default"` when an episode has no language instruction, and creates one chunk per episode.
+- **LeRobot v3 writer** creates one data/video chunk per episode, where LeRobot packs episodes into shared files. Both load and merge. It does not carry `next.reward` / `next.done` / `next.success` yet. Episodes without a language instruction need `--task`.
 - **`--sample` and `--quick`** take the *first* N episodes, not a random subset.
 - **`filter` without `--from-report`** re-scores with a reduced config (gripper dims, FPS, bounds only). Pass `--from-report` to filter on the scores you reviewed.
 - **Zarr** has no FPS metadata, so it defaults to 30 Hz. Pass `--fps` (Push-T is 10 Hz).
@@ -325,7 +325,7 @@ Forge is honest about what it does not do yet. These are tracked and being fixed
 - [~] Streaming reads: LeRobot v3 and Zarr metadata + proprio today; frames and embeddings next
 - [ ] Close the gaps above, starting with rosbag state/action and YAML field mappings
 - [ ] Trim idle starts and ends on write (`convert --trim-idle`)
-- [ ] q01 / q99 quantiles in LeRobot v3 `stats.json` (needed by π0.5-style training)
+- [x] q01 / q99 quantiles in LeRobot v3 `stats.json` (needed by π0.5-style training)
 - [ ] Train / val / test split by episode or session
 - [ ] Snapshots + export: a curated catalog selection → LeRobot / RLDS for training
 - [ ] `forge push` to the Hugging Face Hub

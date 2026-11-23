@@ -9,11 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **LeRobot v3 output now matches `LeRobotDataset.create`** (checked against lerobot 0.5.1 and 0.7.0 by `tests/test_lerobot_v3_spec_parity.py`). Feature dicts drop per-feature `fps`, keep video metadata under `info`, and name image axes `channels`. Data columns are `float32` fixed-size lists. `meta/episodes` rows are packed into one file per 1000 episodes. A Forge conversion now merges with LeRobot recordings via `aggregate_datasets`.
+- **The v3 writer encodes with SVT-AV1** (`libsvtav1`, crf 30, GOP 2), LeRobot's default, because datasets with different codecs cannot be merged. Set `writer_config: {video_codec: libx264, video_preset: medium}` for h264. Cameras narrower than 32 px use h264, since SVT-AV1 hangs on them.
+- **Breaking:** converting to LeRobot v3 fails on an episode with no language instruction unless you pass `--task "..."` (`forge convert`, `forge tokenize write`) or set `writer_config.task`. The task was previously written as `"default"`.
+
 - Quality scorer is now `q-v2-proprio`. Gripper channels and physical action limits are explicit. Invalid or unsupported motion remains unscored.
 - Video results use `video-v2-integrity` and retain per-camera events, coverage, and provenance. Video checks remain separate from the proprioception score.
 - `video_min_sharpness` is the minimum sampled sharpness. `--video-max-frames` caps decode attempts per camera. Recalibrate filters that depend on these values.
 
 ### Fixed
+
+- LeRobot v3 writer keeps joint names (`names` was always `null`). `Episode` gains `state_names` / `action_names`, filled by the LeRobot v2 and v3 readers.
+- LeRobot v3 `stats.json` and per-episode stats include q01–q99 quantiles, image mean/std, and every numeric column, using lerobot 0.7's algorithm. pi0.5 training no longer fails on missing quantiles, and ACT/Diffusion images are normalized.
+- `forge convert --workers N` to LeRobot v3 kept no task strings (all `"default"`) and ignored `writer_config`.
+- A failed episode during conversion no longer leaves a hole in v3 episode indices.
 
 - LeRobot v3 episodes retain metadata FPS and declared cameras. Missing requested video frames raise errors instead of returning substitute images.
 - Missing observations keep their frame alignment. Temporal video checks reset across gaps and decode errors.

@@ -45,6 +45,7 @@ from forge.core.models import (
     Frame,
     LazyImage,
 )
+from forge.formats.lerobot_v3.names import episode_names
 from forge.formats.registry import FormatRegistry
 
 if TYPE_CHECKING:
@@ -445,10 +446,19 @@ class LeRobotV2Reader:
                     is_last=(idx == len(df) - 1),
                 )
 
+        names: dict[str, list[str] | None] = {}
+        info_path = dataset_path / "meta" / "info.json"
+        if info_path.exists():
+            try:
+                names = episode_names(json.loads(info_path.read_text()).get("features", {}))
+            except (OSError, json.JSONDecodeError):
+                names = {}
+
         return Episode(
             episode_id=episode_id,
             _frame_loader=load_frames,
             metadata={"parquet_path": str(parquet_path)},
+            **names,
         )
 
     def _extract_frame(self, video_path: Path, frame_index: int) -> NDArray[Any]:
