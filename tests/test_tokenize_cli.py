@@ -23,7 +23,7 @@ def _write_lerobot_v3_source(tmp_path, num_episodes=3, length=12, dim=7):
 
     rng = np.random.default_rng(0)
     out = tmp_path / "src"
-    writer = LeRobotV3Writer(LeRobotV3WriterConfig(fps=30.0))
+    writer = LeRobotV3Writer(LeRobotV3WriterConfig(fps=30.0, task="test task"))
     for e in range(num_episodes):
         frames = [
             Frame(

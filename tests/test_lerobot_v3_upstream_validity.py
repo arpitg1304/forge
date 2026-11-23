@@ -134,13 +134,14 @@ class TestInfoJson:
         info = json.loads((written_v3 / INFO_PATH).read_text())
         assert info["video_path"] == DEFAULT_VIDEO_PATH
 
-    def test_per_feature_fps_present_on_non_video(self, written_v3: Path):
+    def test_feature_schema_matches_create(self, written_v3: Path):
+        """Feature dicts in the form LeRobotDataset.create writes: no
+        per-feature fps, video metadata under "info"."""
         info = json.loads((written_v3 / INFO_PATH).read_text())
         for fname, fdef in info["features"].items():
+            assert "fps" not in fdef, fname
             if fdef.get("dtype") == "video":
-                continue
-            assert "fps" in fdef, \
-                f"feature {fname!r} missing required `fps` (v3 requires fps on every non-video feature)"
+                assert "info" in fdef and "video_info" not in fdef, fname
 
     def test_size_fields_are_ints(self, written_v3: Path):
         info = json.loads((written_v3 / INFO_PATH).read_text())

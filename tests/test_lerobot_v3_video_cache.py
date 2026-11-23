@@ -63,7 +63,7 @@ def dataset(tmp_path: Path) -> Path:
         inferred_fps=FPS, inferred_robot_type="test",
         cameras={"cam": CameraInfo(name="cam", height=H, width=W)},
     )
-    LeRobotV3Writer(LeRobotV3WriterConfig(fps=FPS, robot_type="test")).write_dataset(
+    LeRobotV3Writer(LeRobotV3WriterConfig(fps=FPS, robot_type="test", task="test task")).write_dataset(
         iter(episodes), out, dataset_info=info
     )
     return out

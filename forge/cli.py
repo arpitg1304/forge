@@ -775,6 +775,11 @@ def convert_cmd(
     ),
     fps: float | None = typer.Option(None, "--fps", help="Override frames per second"),
     robot_type: str | None = typer.Option(None, "--robot-type", "-r", help="Robot type"),
+    task: str | None = typer.Option(
+        None,
+        "--task",
+        help="Task string for episodes with no language instruction (LeRobot v3 needs one per episode)",
+    ),
     camera: list[str] | None = typer.Option(
         None, "--camera", "-c", help="Camera name mapping (format: source=target). Can be repeated."
     ),
@@ -799,6 +804,7 @@ def convert_cmd(
         forge convert ./rlds_dataset ./output --format lerobot-v3 --fps 30
         forge convert hf://lerobot/pusht ./output --format lerobot-v3
         forge convert ./data.zarr ./output --format lerobot-v3 --visualize
+        forge convert ./data.zarr ./output --task "Push the T-shaped block onto the target"
         forge convert ./data.zarr ./output -c front_cam=observation.images.front -c side_cam=observation.images.side
         forge convert ./data.zarr ./output --dry-run  # Preview without writing
         forge convert ./dataset ./output --config conversion.yaml
@@ -844,6 +850,8 @@ def convert_cmd(
         config.fps = fps
     if robot_type:
         config.robot_type = robot_type
+    if task:
+        config.writer_config["task"] = task
     if fail_on_error:
         config.fail_on_error = fail_on_error
     if workers > 1:
@@ -3477,6 +3485,9 @@ def tokenize_write_cmd(
         False, "--keep-actions", help="Retain the float action column alongside tokens"
     ),
     fps: float = typer.Option(30.0, "--fps", "-f", help="Output dataset FPS"),
+    task: str | None = typer.Option(
+        None, "--task", help="Task string for episodes with no language instruction"
+    ),
 ) -> None:
     """Write a LeRobot v3 dataset with an action_tokens column.
 
@@ -3519,6 +3530,7 @@ def tokenize_write_cmd(
                 num_bins=num_bins,
                 keep_actions=keep_actions,
                 fps=fps,
+                task=task,
                 progress_callback=_cb,
             )
     except ForgeError as e:

@@ -274,6 +274,9 @@ class Episode:
         state_dim: Dimensionality of state vector.
         action_dim: Dimensionality of action vector.
         fps: Frames per second.
+        state_names: Optional per-dimension names of the state vector
+            (e.g. joint names), in order. None when the source has none.
+        action_names: Optional per-dimension names of the action vector.
     """
 
     episode_id: str
@@ -289,6 +292,8 @@ class Episode:
     state_dim: int | None = None
     action_dim: int | None = None
     fps: float | None = None
+    state_names: list[str] | None = None
+    action_names: list[str] | None = None
 
     # Frame access - lazy iterator
     _frame_loader: Callable[[], Iterator[Frame]] | None = field(default=None, repr=False)

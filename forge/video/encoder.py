@@ -66,7 +66,7 @@ class VideoEncoderConfig:
 
     codec: str = "libx264"
     crf: int = 23
-    preset: str = "medium"
+    preset: str | None = "medium"
     pixel_format: str = "yuv420p"
     gop_size: int = 12
 
@@ -128,10 +128,10 @@ class VideoEncoder:
             stream.width = width
             stream.height = height
             stream.pix_fmt = self.config.pixel_format
-            stream.options = {
-                "crf": str(self.config.crf),
-                "preset": self.config.preset,
-            }
+            options = {"crf": str(self.config.crf)}
+            if self.config.preset is not None:
+                options["preset"] = str(self.config.preset)
+            stream.options = options
             # Set GOP size
             stream.gop_size = self.config.gop_size
 
@@ -213,10 +213,10 @@ class VideoEncoder:
             stream.width = width
             stream.height = height
             stream.pix_fmt = self.config.pixel_format
-            stream.options = {
-                "crf": str(self.config.crf),
-                "preset": self.config.preset,
-            }
+            options = {"crf": str(self.config.crf)}
+            if self.config.preset is not None:
+                options["preset"] = str(self.config.preset)
+            stream.options = options
             stream.gop_size = self.config.gop_size
 
             frame_count = 0

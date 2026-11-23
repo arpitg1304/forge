@@ -59,7 +59,7 @@ def _load_info(dataset_path: Path) -> dict:
 
 def test_column_hook_off_by_default(tmp_path):
     """With no config, no action_tokens column or feature is emitted."""
-    writer = LeRobotV3Writer(LeRobotV3WriterConfig(fps=30.0))
+    writer = LeRobotV3Writer(LeRobotV3WriterConfig(fps=30.0, task="test task"))
     out = tmp_path / "ds"
     eps = _make_episodes()
     for i, ep in enumerate(eps):
@@ -78,7 +78,7 @@ def test_column_hook_off_by_default(tmp_path):
 
 def test_column_hook_emits_int_column(tmp_path):
     """When configured and extras present, an int64 action_tokens column appears."""
-    cfg = LeRobotV3WriterConfig(fps=30.0, tokenized_action_feature="action_tokens")
+    cfg = LeRobotV3WriterConfig(fps=30.0, tokenized_action_feature="action_tokens", task="test task")
     writer = LeRobotV3Writer(cfg)
     out = tmp_path / "ds"
     eps = _make_episodes()
@@ -102,7 +102,7 @@ def test_column_hook_emits_int_column(tmp_path):
 
 def test_column_hook_excluded_from_stats(tmp_path):
     """Token ids must not get min/max/mean/std stats computed."""
-    cfg = LeRobotV3WriterConfig(fps=30.0, tokenized_action_feature="action_tokens")
+    cfg = LeRobotV3WriterConfig(fps=30.0, tokenized_action_feature="action_tokens", task="test task")
     writer = LeRobotV3Writer(cfg)
     out = tmp_path / "ds"
     eps = _make_episodes()
@@ -149,6 +149,7 @@ def test_tokenize_and_write_end_to_end(tmp_path):
         source=tmp_path / "fake_src",
         output=out,
         strategy="openvla-bins",
+        task="test task",
         reader=_StubReader(eps),
         fps=30.0,
     )
@@ -180,6 +181,7 @@ def test_tokenize_and_write_drops_actions_by_default(tmp_path):
         source=tmp_path / "fake_src",
         output=out,
         strategy="uniform-bins",
+        task="test task",
         reader=_StubReader(eps),
         fps=30.0,
     )
@@ -195,6 +197,7 @@ def test_tokenize_and_write_keep_actions(tmp_path):
         source=tmp_path / "fake_src",
         output=out,
         strategy="uniform-bins",
+        task="test task",
         reader=_StubReader(eps),
         fps=30.0,
         keep_actions=True,
@@ -220,6 +223,7 @@ def test_tokenize_and_write_with_pretrained_tokenizer(tmp_path):
         output=out,
         strategy="quantile-bins",
         tokenizer_path=tok_file,
+        task="test task",
         reader=_StubReader(eps),
         fps=30.0,
     )
@@ -267,6 +271,7 @@ def test_tokenize_and_write_rejects_chunk_tokenizer(tmp_path):
                 source=tmp_path / "fake_src",
                 output=tmp_path / "out",
                 strategy="fake-chunk",
+                task="test task",
                 reader=_StubReader(eps),
                 fps=30.0,
             )

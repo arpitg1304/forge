@@ -15,7 +15,7 @@ from typing import Any
 
 from forge.config.models import ConversionConfig
 from forge.core.exceptions import ConversionError, UnsupportedFormatError
-from forge.core.models import DatasetInfo, Episode
+from forge.core.models import DatasetInfo
 from forge.formats.registry import FormatRegistry
 
 
@@ -91,7 +91,7 @@ def _process_episode_worker(
     from pathlib import Path
 
     from forge.config.models import ConversionConfig
-    from forge.core.models import CameraInfo, DatasetInfo, FieldSchema, Dtype
+    from forge.core.models import CameraInfo, DatasetInfo
     from forge.formats.registry import FormatRegistry
 
     try:
@@ -145,6 +145,9 @@ def _process_episode_worker(
                 wconfig.action_field = config.action_field
             if hasattr(wconfig, "state_field") and config.state_field:
                 wconfig.state_field = config.state_field
+            for key, value in config.writer_config.items():
+                if hasattr(wconfig, key):
+                    setattr(wconfig, key, value)
 
         # Read and write the specific episode
         episodes_iter = reader.read_episodes(source)
@@ -155,16 +158,9 @@ def _process_episode_worker(
                 # Load frames to get count (writer will iterate them anyway)
                 frames = episode.load_frames()
                 num_frames = len(frames)
+                # The writer flushes the episode to disk itself; finalize in
+                # the parent process assembles the metadata.
                 writer.write_episode(episode, output, episode_index=episode_index)
-
-                # Flush the data to disk (important for parallel processing)
-                # Each worker must flush its own data since there's no shared state
-                # Set chunk index to episode index to avoid file conflicts
-                if hasattr(writer, "_flush_chunk"):
-                    if hasattr(writer, "_current_chunk_index"):
-                        writer._current_chunk_index = episode_index
-                    writer._flush_chunk(output)
-
                 break
             elif idx > episode_index:
                 break
@@ -295,6 +291,8 @@ class Converter:
 
         # 6. Convert episodes (parallel or sequential)
         total_episodes = dataset_info.num_episodes or 0
+        if hasattr(writer, "begin"):
+            writer.begin(output)
 
         if self.config.num_workers > 1 and total_episodes > 1:
             # Parallel processing
@@ -320,7 +318,9 @@ class Converter:
                 try:
                     # Load frames to get accurate count
                     frames = episode.load_frames()
-                    writer.write_episode(episode, output, episode_index=episode_idx)
+                    # Number written episodes contiguously, so a skipped
+                    # failure doesn't leave a hole in the output indices.
+                    writer.write_episode(episode, output, episode_index=result.episodes_converted)
                     result.episodes_converted += 1
                     result.total_frames += len(frames)
 
@@ -472,8 +472,6 @@ class Converter:
                 futures[future] = episode_idx
 
             # Collect results as they complete
-            # Track per-episode frame counts to avoid re-reading parquet files in finalize()
-            episode_frame_counts: dict[int, int] = {}
 
             for future in as_completed(futures):
                 episode_idx = futures[future]
@@ -488,7 +486,6 @@ class Converter:
                     if ep_result.success:
                         result.episodes_converted += 1
                         result.total_frames += ep_result.num_frames
-                        episode_frame_counts[ep_result.episode_index] = ep_result.num_frames
                     else:
                         result.episodes_failed += 1
                         error_msg = f"Episode {episode_idx}: {ep_result.error}"
@@ -511,10 +508,6 @@ class Converter:
 
                     if self.config.fail_on_error:
                         raise ConversionError(source_format, target_format, error_msg)
-
-        # Store episode frame counts in dataset_info for finalize()
-        # This avoids re-reading parquet files to get lengths
-        dataset_info.metadata["_parallel_episode_frame_counts"] = episode_frame_counts
 
         return result
 
